@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FAF8F5;
+  --foreground: #1E2922;
+  --surface: #FFFFFF;
+  --surface-subtle: #F4EFEB;
+  --surface-border: #E5DFD5;
+  --surface-border-strong: #CDC5B7;
+  
+  --primary: #1C3F30;
+  --primary-hover: #153226;
+  --primary-light: #E8F0EB;
+  --primary-foreground: #FFFFFF;
+  
+  --accent: #C85A32;
+  --accent-hover: #B24E29;
+  --accent-light: #FDF1EB;
+  --accent-foreground: #FFFFFF;
+  
+  --muted: #64746D;
+  --muted-light: #8E9E96;
+  
+  --success: #2E7D47;
+  --success-bg: #EDF7F0;
+  --warning: #B46B08;
+  --warning-bg: #FEF6EB;
+  --danger: #C0392B;
+  --danger-bg: #FDF0ED;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom utility colors */
+.bg-warm-bg { background-color: var(--background); }
+.bg-warm-surface { background-color: var(--surface); }
+.bg-warm-subtle { background-color: var(--surface-subtle); }
+.border-warm { border-color: var(--surface-border); }
+.border-warm-strong { border-color: var(--surface-border-strong); }
+
+.text-primary-forest { color: var(--primary); }
+.bg-primary-forest { background-color: var(--primary); }
+.bg-primary-forest:hover { background-color: var(--primary-hover); }
+
+.text-accent-terracotta { color: var(--accent); }
+.bg-accent-terracotta { background-color: var(--accent); }
+.bg-accent-terracotta:hover { background-color: var(--accent-hover); }
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Print optimizations */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+  }
+
+  .no-print,
+  nav,
+  header button,
+  .print-hide {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-page-break {
+    page-break-before: always;
+    break-before: always;
+  }
+
+  .shadow-sm,
+  .shadow,
+  .shadow-md,
+  .shadow-lg {
+    box-shadow: none !important;
+  }
+
+  .border,
+  .border-warm {
+    border-color: #D1D5DB !important;
+  }
+}

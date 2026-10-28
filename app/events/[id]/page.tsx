@@ -1,0 +1,271 @@
+'use client';
+
+import React, { useEffect, useState, use, Suspense } from 'react';
+import Navbar from '@/components/ui/Navbar';
+import WorkspaceHeader from '@/components/workspace/WorkspaceHeader';
+import OverviewTab from '@/components/workspace/OverviewTab';
+import BudgetTab from '@/components/workspace/BudgetTab';
+import TimelineTab from '@/components/workspace/TimelineTab';
+import VendorsTab from '@/components/workspace/VendorsTab';
+import ScheduleTab from '@/components/workspace/ScheduleTab';
+import IdeasTab from '@/components/workspace/IdeasTab';
+import { EventDetails } from '@/types/event';
+import { eventStorage } from '@/lib/storage/eventStorage';
+import { generateSamplePlan } from '@/lib/ai/sampleProvider';
+import {
+  LayoutDashboard,
+  DollarSign,
+  Calendar,
+  Users,
+  Clock,
+  Sparkles,
+  ArrowLeft,
+  AlertCircle,
+  CheckCircle2,
+} from 'lucide-react';
+import Link from 'next/link';
+
+interface WorkspacePageProps {
+  params: Promise<{ id: string }>;
+}
+
+type TabType = 'overview' | 'budget' | 'timeline' | 'vendors' | 'schedule' | 'ideas';
+
+function WorkspaceContent({ params }: WorkspacePageProps) {
+  const resolvedParams = use(params);
+
+  const [event, setEvent] = useState<EventDetails | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const found = eventStorage.getEventById(resolvedParams.id);
+      setEvent(found);
+      setIsLoaded(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [resolvedParams.id]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleUpdateEvent = (updates: Partial<EventDetails>) => {
+    if (!event) return;
+    const updated = eventStorage.updateEvent(event.id, updates);
+    if (updated) {
+      setEvent(updated);
+    }
+  };
+
+  const handleGeneratePlan = async () => {
+    if (!event || isGenerating) return;
+    setIsGenerating(true);
+
+    try {
+      const res = await fetch('/api/generate-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(event),
+      });
+
+      const data = await res.json();
+      if (data.success && data.plan) {
+        handleUpdateEvent({ plan: data.plan });
+        showToast(
+          data.source === 'live-ai'
+            ? 'Live Gemini AI generated your plan!'
+            : data.notice || 'Generated curated sample plan in Demo Mode.'
+        );
+      } else {
+        alert(data.error || 'Failed to generate plan.');
+      }
+    } catch (err) {
+      console.error('Generation error:', err);
+      // Local fallback
+      const sample = generateSamplePlan(event);
+      handleUpdateEvent({ plan: sample });
+      showToast('Offline fallback: Loaded curated sample plan in Demo Mode.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleLoadSamplePlan = () => {
+    if (!event) return;
+    const sample = generateSamplePlan(event);
+    handleUpdateEvent({ plan: sample });
+    showToast('Loaded curated sample plan in Demo Mode.');
+  };
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F5] flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="w-8 h-8 border-3 border-[#1C3F30] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!event) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F5] flex flex-col">
+        <Navbar />
+        <div className="flex-1 max-w-lg mx-auto flex flex-col items-center justify-center text-center p-8">
+          <AlertCircle className="w-12 h-12 text-[#C0392B] mb-3" />
+          <h2 className="text-xl font-bold text-[#1E2922]">Celebration Plan Not Found</h2>
+          <p className="text-xs text-[#64746D] mt-1 mb-6">
+            The event workspace you are attempting to access does not exist or has been deleted.
+          </p>
+          <Link
+            href="/"
+            className="inline-flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-[#1C3F30] text-white text-xs font-semibold"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Return to Dashboard</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'budget', label: 'Budget Planner', icon: DollarSign },
+    { id: 'timeline', label: 'Timeline & Tasks', icon: Calendar },
+    { id: 'vendors', label: 'Vendor Checklist', icon: Users },
+    { id: 'schedule', label: 'Day Schedule', icon: Clock },
+    { id: 'ideas', label: 'Ideas & Refinement', icon: Sparkles },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#FAF8F5] flex flex-col">
+      <Navbar />
+
+      {/* Floating Toast notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center space-x-2 px-4 py-3 rounded-xl bg-[#1C3F30] text-white shadow-lg text-xs sm:text-sm animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-[#B7E4C7]" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Workspace Header Strip */}
+      <WorkspaceHeader
+        event={event}
+        onGeneratePlan={handleGeneratePlan}
+        isGenerating={isGenerating}
+        onLoadSamplePlan={handleLoadSamplePlan}
+      />
+
+      {/* Navigation Tabs Bar */}
+      <div className="no-print bg-[#FFFFFF] border-b border-[#E5DFD5] sticky top-16 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-1 sm:space-x-4 overflow-x-auto py-2">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as TabType)}
+                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
+                    isActive
+                      ? 'bg-[#1C3F30] text-white shadow-xs'
+                      : 'text-[#64746D] hover:text-[#1E2922] hover:bg-[#F4EFEB]'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Tab Content */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Screen/Interactive View */}
+        <div className="no-print">
+          {activeTab === 'overview' && (
+            <OverviewTab event={event} onNavigateTab={(t) => setActiveTab(t as TabType)} />
+          )}
+
+          {activeTab === 'budget' && (
+            <BudgetTab event={event} onUpdateEvent={handleUpdateEvent} />
+          )}
+
+          {activeTab === 'timeline' && (
+            <TimelineTab event={event} onUpdateEvent={handleUpdateEvent} />
+          )}
+
+          {activeTab === 'vendors' && (
+            <VendorsTab event={event} onUpdateEvent={handleUpdateEvent} />
+          )}
+
+          {activeTab === 'schedule' && (
+            <ScheduleTab event={event} onUpdateEvent={handleUpdateEvent} />
+          )}
+
+          {activeTab === 'ideas' && (
+            <IdeasTab event={event} onUpdateEvent={handleUpdateEvent} />
+          )}
+        </div>
+
+        {/* Print Layout (All sections rendered seamlessly in print mode) */}
+        <div className="hidden print:block print-page-break space-y-8">
+          <div className="border-b pb-4 mb-6">
+            <h1 className="text-2xl font-bold">{event.name} — Comprehensive Event Plan</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Date: {event.date} • Location: {event.location} • Headcount: {event.guestCount} guests • Planned Budget: {event.currency} {event.totalBudget}
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            <OverviewTab event={event} onNavigateTab={() => {}} />
+            <ScheduleTab event={event} onUpdateEvent={() => {}} />
+            <BudgetTab event={event} onUpdateEvent={() => {}} />
+            <TimelineTab event={event} onUpdateEvent={() => {}} />
+            <VendorsTab event={event} onUpdateEvent={() => {}} />
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="no-print mt-auto py-6 border-t border-[#E5DFD5] bg-[#FFFFFF] text-center text-xs text-[#64746D]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <p>
+            <strong>Gatherly AI</strong> — Event Workspace #{event.id}
+          </p>
+          <p className="text-[11px] text-[#8E9E96]">
+            Browser Local Storage • Reconciled Integer Arithmetic • Production MVP
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+export default function WorkspacePage({ params }: WorkspacePageProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-8">
+          <div className="w-8 h-8 border-3 border-[#1C3F30] border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-xs text-[#64746D] font-medium">Opening event workspace...</p>
+        </div>
+      }
+    >
+      <WorkspaceContent params={params} />
+    </Suspense>
+  );
+}
