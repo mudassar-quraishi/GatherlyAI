@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { EventInputSchema, RefinePlanSchema } from '@/lib/validation/schemas';
+import {
+  EventInputSchema,
+  RefinePlanSchema,
+  BudgetCategorySchema,
+  TimelineTaskSchema,
+  VendorItemSchema,
+  ScheduleItemSchema,
+  CurrentPlanSchema,
+} from '@/lib/validation/schemas';
+import { createDefaultDemoEvent } from '@/lib/ai/sampleProvider';
 
 describe('Validation Schemas (Zod)', () => {
   it('validates a complete, valid event input', () => {
@@ -45,35 +54,132 @@ describe('Validation Schemas (Zod)', () => {
     }
   });
 
-  it('validates a plan refinement request', () => {
-    const validRefinement = {
+  it('validates a complete, real demo event plan for refinement', () => {
+    const demo = createDefaultDemoEvent();
+    const refinementPayload = {
       modificationType: 'budget-friendly',
-      customPrompt: 'Focus on reducing floral expenses',
+      customPrompt: 'Cut down on decorative lighting costs',
       eventDetails: {
-        name: 'Community Carnival',
-        eventType: 'community',
-        date: '2026-11-20',
-        location: 'Community Park',
-        guestCount: 300,
-        totalBudget: 150000,
-        currency: 'INR',
-        styleTheme: 'Festive',
-        venueType: 'outdoor',
-        atmosphere: 'Lively',
+        name: demo.name,
+        eventType: demo.eventType,
+        date: demo.date,
+        location: demo.location,
+        guestCount: demo.guestCount,
+        totalBudget: demo.totalBudget,
+        currency: demo.currency,
+        styleTheme: demo.styleTheme,
+        venueType: demo.venueType,
+        atmosphere: demo.atmosphere,
+        priorities: demo.priorities,
       },
-      currentPlan: {
-        eventSummary: 'Summary of the event',
-        themeIdeas: { name: 'Festive', description: '', colorPalette: [], vibeKeywords: [] },
-        budgetBreakdown: { categories: [], totalAllocated: 0, unallocated: 0, contingencyAmount: 0 },
-        timelineTasks: [],
-        vendorChecklist: [],
-        eventDaySchedule: [],
-        personalizedIdeas: [],
-        risksAndContingencies: [],
-      },
+      currentPlan: demo.plan,
     };
 
-    const result = RefinePlanSchema.safeParse(validRefinement);
+    const result = RefinePlanSchema.safeParse(refinementPayload);
     expect(result.success).toBe(true);
+  });
+
+  it('rejects a budget category with a negative allocated amount', () => {
+    const invalidCategory = {
+      name: 'Floral Decor',
+      allocatedAmount: -5000,
+      isEssential: true,
+    };
+    const result = BudgetCategorySchema.safeParse(invalidCategory);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a timeline task with an invalid stage enum', () => {
+    const invalidTask = {
+      title: 'Final walkthrough',
+      description: 'Review venue setup',
+      stage: 'not-a-real-stage',
+      dueDate: '2026-11-20',
+      priority: 'high',
+    };
+    const result = TimelineTaskSchema.safeParse(invalidTask);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a vendor object missing required fields', () => {
+    const invalidVendor = {
+      category: 'Catering',
+      // missing title, needDescription, whyItMatters, bookingDeadline, priority
+    };
+    const result = VendorItemSchema.safeParse(invalidVendor);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a schedule item with missing activity name', () => {
+    const invalidSchedule = {
+      startTime: '10:00 AM',
+      endTime: '11:00 AM',
+      activity: '',
+      description: 'Morning tea',
+    };
+    const result = ScheduleItemSchema.safeParse(invalidSchedule);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects currentPlan with arbitrary invalid primitives in place of objects', () => {
+    const malformedCurrentPlan = {
+      eventSummary: 'A great party',
+      themeIdeas: 'NOT_AN_OBJECT', // Should be object
+      budgetBreakdown: { categories: [] },
+      timelineTasks: [],
+      vendorChecklist: [],
+      eventDaySchedule: [],
+      personalizedIdeas: [],
+      risksAndContingencies: [],
+    };
+    const result = CurrentPlanSchema.safeParse(malformedCurrentPlan);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unreasonably large custom refinement prompts exceeding character limits', () => {
+    const demo = createDefaultDemoEvent();
+    const oversizedPayload = {
+      modificationType: 'custom',
+      customPrompt: 'A'.repeat(800), // Max allowed is 600
+      eventDetails: {
+        name: demo.name,
+        eventType: demo.eventType,
+        date: demo.date,
+        location: demo.location,
+        guestCount: demo.guestCount,
+        totalBudget: demo.totalBudget,
+        currency: demo.currency,
+        styleTheme: demo.styleTheme,
+        venueType: demo.venueType,
+        atmosphere: demo.atmosphere,
+      },
+      currentPlan: demo.plan,
+    };
+
+    const result = RefinePlanSchema.safeParse(oversizedPayload);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unsupported modification types', () => {
+    const demo = createDefaultDemoEvent();
+    const invalidTypePayload = {
+      modificationType: 'fly-to-the-moon',
+      eventDetails: {
+        name: demo.name,
+        eventType: demo.eventType,
+        date: demo.date,
+        location: demo.location,
+        guestCount: demo.guestCount,
+        totalBudget: demo.totalBudget,
+        currency: demo.currency,
+        styleTheme: demo.styleTheme,
+        venueType: demo.venueType,
+        atmosphere: demo.atmosphere,
+      },
+      currentPlan: demo.plan,
+    };
+
+    const result = RefinePlanSchema.safeParse(invalidTypePayload);
+    expect(result.success).toBe(false);
   });
 });

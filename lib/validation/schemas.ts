@@ -19,6 +19,111 @@ export const EventInputSchema = z.object({
   additionalNotes: z.string().max(1000).optional().default(''),
 });
 
+// ============================================================================
+// Concrete Sub-Schemas for Plan Elements (Zero z.any())
+// ============================================================================
+
+export const ThemeIdeaSchema = z.object({
+  name: z.string().min(1).max(150),
+  description: z.string().max(1000),
+  colorPalette: z.array(z.string().max(50)),
+  vibeKeywords: z.array(z.string().max(50)),
+});
+
+export const BudgetCategorySchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1).max(120),
+  allocatedAmount: z.number().min(0, 'Allocation must not be negative'),
+  actualSpent: z.number().min(0).optional().default(0),
+  isEssential: z.boolean().default(true),
+  notes: z.string().max(500).optional(),
+});
+
+export const BudgetBreakdownSchema = z.object({
+  categories: z.array(BudgetCategorySchema),
+  totalAllocated: z.number().optional(),
+  unallocated: z.number().optional(),
+  contingencyAmount: z.number().optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export const TimelineTaskSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(1000),
+  stage: z.enum([
+    'initial-planning',
+    'early-preparations',
+    'month-before',
+    'final-week',
+    'day-before',
+    'event-day',
+    'post-event',
+  ]),
+  dueDate: z.string().min(1),
+  priority: z.enum(['high', 'medium', 'low']),
+  status: z.enum(['todo', 'in-progress', 'done']).default('todo'),
+  category: z.string().max(100).optional(),
+  owner: z.string().max(100).optional(),
+});
+
+export const VendorItemSchema = z.object({
+  id: z.string().optional(),
+  category: z.string().min(1).max(100),
+  title: z.string().min(1).max(200),
+  needDescription: z.string().max(1000),
+  whyItMatters: z.string().max(1000),
+  bookingDeadline: z.string().min(1),
+  priority: z.enum(['high', 'medium', 'low']),
+  status: z.enum(['needed', 'contacted', 'confirmed', 'not-required']).default('needed'),
+  estimatedCost: z.number().min(0).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export const ScheduleItemSchema = z.object({
+  id: z.string().optional(),
+  startTime: z.string().min(1).max(30),
+  endTime: z.string().min(1).max(30),
+  activity: z.string().min(1).max(200),
+  description: z.string().max(1000),
+  responsiblePerson: z.string().max(100).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export const PersonalizedIdeaSchema = z.object({
+  id: z.string().optional(),
+  category: z.string().min(1).max(100),
+  title: z.string().min(1).max(200),
+  description: z.string().max(1500),
+  whyItFits: z.string().max(1000),
+  tags: z.array(z.string().max(50)).optional(),
+});
+
+export const RiskContingencySchema = z.object({
+  risk: z.string().min(1).max(300),
+  plan: z.string().min(1).max(1000),
+  severity: z.enum(['low', 'medium', 'high']),
+});
+
+// ============================================================================
+// Authoritative Current Plan Schema for Plan Refinement
+// ============================================================================
+
+export const CurrentPlanSchema = z.object({
+  eventSummary: z.string().min(5),
+  themeIdeas: ThemeIdeaSchema,
+  budgetBreakdown: BudgetBreakdownSchema,
+  timelineTasks: z.array(TimelineTaskSchema),
+  vendorChecklist: z.array(VendorItemSchema),
+  eventDaySchedule: z.array(ScheduleItemSchema),
+  personalizedIdeas: z.array(PersonalizedIdeaSchema),
+  risksAndContingencies: z.array(RiskContingencySchema),
+  generatedAt: z.string().optional(),
+  generationSource: z.enum(['live-ai', 'demo']).optional(),
+  modelUsed: z.string().optional(),
+  lastRefinedAt: z.string().optional(),
+});
+
 export const RefinePlanSchema = z.object({
   modificationType: z.enum([
     'budget-friendly',
@@ -31,38 +136,28 @@ export const RefinePlanSchema = z.object({
   ]),
   customPrompt: z.string().max(600).optional(),
   eventDetails: z.object({
-    name: z.string(),
+    name: z.string().min(1).max(100),
     eventType: z.string(),
     date: z.string(),
     location: z.string(),
-    guestCount: z.number(),
-    totalBudget: z.number(),
-    currency: z.string(),
+    guestCount: z.number().int().min(1),
+    totalBudget: z.number().min(0),
+    currency: z.string().min(1).max(10),
     styleTheme: z.string(),
     venueType: z.string(),
     atmosphere: z.string(),
     priorities: z.array(z.string()).optional(),
   }),
-  currentPlan: z.object({
-    eventSummary: z.string(),
-    themeIdeas: z.any(),
-    budgetBreakdown: z.any(),
-    timelineTasks: z.array(z.any()),
-    vendorChecklist: z.array(z.any()),
-    eventDaySchedule: z.array(z.any()),
-    personalizedIdeas: z.array(z.any()),
-    risksAndContingencies: z.array(z.any()),
-  }),
+  currentPlan: CurrentPlanSchema,
 });
+
+// ============================================================================
+// Authoritative AI Generation Output Schema (from Model)
+// ============================================================================
 
 export const AIPlanOutputSchema = z.object({
   eventSummary: z.string().min(10),
-  themeIdeas: z.object({
-    name: z.string(),
-    description: z.string(),
-    colorPalette: z.array(z.string()),
-    vibeKeywords: z.array(z.string()),
-  }),
+  themeIdeas: ThemeIdeaSchema,
   budgetBreakdown: z.object({
     categories: z.array(
       z.object({

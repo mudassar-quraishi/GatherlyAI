@@ -35,7 +35,14 @@ export const eventStorage = {
    */
   getEventById(id: string): EventDetails | null {
     const events = this.getAllEvents();
-    return events.find((e) => e.id === id) || null;
+    const found = events.find((e) => e.id === id);
+    if (found) return found;
+
+    // Auto-seed demo event on direct navigation if requested
+    if (id === 'demo-event-wedding-2026') {
+      return this.loadDemoEvent();
+    }
+    return null;
   },
 
   /**

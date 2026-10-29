@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
   Palette,
@@ -25,6 +25,18 @@ export default function OverviewTab({ event, onNavigateTab }: OverviewTabProps) 
   const categories = plan?.budgetBreakdown.categories || [];
   const budgetHealth = calculateBudgetHealth(event.totalBudget, categories);
 
+  const [announcement, setAnnouncement] = useState<string>('');
+  const prevScoreRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // Only announce meaningful changes after initial mount
+    if (prevScoreRef.current !== null && prevScoreRef.current !== readiness.score) {
+      const msg = `Event preparation readiness updated to ${readiness.score} percent, ${readiness.rating.replace('-', ' ')}.`;
+      setAnnouncement(msg);
+    }
+    prevScoreRef.current = readiness.score;
+  }, [readiness.score, readiness.rating]);
+
   const tasks = plan?.timelineTasks || [];
   const upcomingTasks = tasks
     .filter((t) => t.status !== 'done')
@@ -32,6 +44,16 @@ export default function OverviewTab({ event, onNavigateTab }: OverviewTabProps) 
 
   return (
     <div className="space-y-6">
+      {/* Dedicated Screen Reader Live Announcement Region */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {announcement}
+      </div>
+
       {/* AI Event Summary Banner */}
       {plan && (
         <div className="bg-[#FFFFFF] border border-[#E5DFD5] rounded-2xl p-6 shadow-sm">
@@ -143,7 +165,10 @@ export default function OverviewTab({ event, onNavigateTab }: OverviewTabProps) 
         </div>
 
         {/* Readiness Score Breakdown */}
-        <div className="bg-[#FFFFFF] border border-[#E5DFD5] rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+        <div
+          aria-label={`Preparation readiness score: ${readiness.score} percent, ${readiness.rating.replace('-', ' ')}`}
+          className="bg-[#FFFFFF] border border-[#E5DFD5] rounded-2xl p-6 shadow-sm flex flex-col justify-between"
+        >
           <div>
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-[#64746D] uppercase tracking-wider">

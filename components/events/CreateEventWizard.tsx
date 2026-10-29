@@ -634,6 +634,7 @@ export default function CreateEventWizard() {
 
           {currentStep < 3 ? (
             <button
+              key="btn-continue"
               type="button"
               onClick={handleNext}
               className="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-[#1C3F30] hover:bg-[#153226] text-white text-sm font-semibold shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#1C3F30] focus:ring-offset-2"
@@ -643,6 +644,7 @@ export default function CreateEventWizard() {
             </button>
           ) : (
             <button
+              key="btn-submit"
               type="submit"
               className="inline-flex items-center space-x-2 px-7 py-3 rounded-xl bg-[#1C3F30] hover:bg-[#153226] text-white text-sm font-bold shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#1C3F30] focus:ring-offset-2"
             >

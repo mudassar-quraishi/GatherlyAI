@@ -2,10 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 import { EventInputSchema } from '@/lib/validation/schemas';
 import { generateEventPlanWithAI } from '@/lib/ai/geminiService';
 import { EventDetails } from '@/types/event';
-
+import { checkRateLimit, RATE_LIMIT_POLICIES, getClientIdentifier } from '@/lib/security/rateLimiter';
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Enforce server-side rate limiting
+    const clientId = getClientIdentifier(req.headers);
+    const rateLimit = await checkRateLimit(clientId, RATE_LIMIT_POLICIES.GENERATE_PLAN);
+
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        {
+          error: 'Too Many Requests',
+          message: `Rate limit exceeded. Please wait ${rateLimit.retryAfterSeconds}s before generating another plan.`,
+          retryAfter: rateLimit.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.retryAfterSeconds),
+            'X-RateLimit-Limit': String(rateLimit.limit),
+            'X-RateLimit-Remaining': String(rateLimit.remaining),
+            'X-RateLimit-Reset': String(rateLimit.resetSeconds),
+          },
+        }
+      );
+    }
+
     const body = await req.json();
 
     // Validate request payload

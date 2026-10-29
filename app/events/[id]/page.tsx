@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, use, Suspense } from 'react';
+import React, { useEffect, useState, use, Suspense, useRef } from 'react';
 import Navbar from '@/components/ui/Navbar';
 import WorkspaceHeader from '@/components/workspace/WorkspaceHeader';
 import OverviewTab from '@/components/workspace/OverviewTab';
@@ -37,6 +37,7 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
   const [event, setEvent] = useState<EventDetails | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -145,6 +146,26 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
     { id: 'ideas', label: 'Ideas & Refinement', icon: Sparkles },
   ];
 
+  const handleTabKeyDown = (e: React.KeyboardEvent, index: number) => {
+    let targetIndex = -1;
+    if (e.key === 'ArrowRight') {
+      targetIndex = (index + 1) % tabs.length;
+    } else if (e.key === 'ArrowLeft') {
+      targetIndex = (index - 1 + tabs.length) % tabs.length;
+    } else if (e.key === 'Home') {
+      targetIndex = 0;
+    } else if (e.key === 'End') {
+      targetIndex = tabs.length - 1;
+    }
+
+    if (targetIndex !== -1) {
+      e.preventDefault();
+      const nextTab = tabs[targetIndex];
+      setActiveTab(nextTab.id as TabType);
+      tabRefs.current[targetIndex]?.focus();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#FAF8F5] flex flex-col">
       <Navbar />
@@ -165,19 +186,32 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
         onLoadSamplePlan={handleLoadSamplePlan}
       />
 
-      {/* Navigation Tabs Bar */}
+      {/* Navigation Tabs Bar with WAI-ARIA Tablist */}
       <div className="no-print bg-[#FFFFFF] border-b border-[#E5DFD5] sticky top-16 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-1 sm:space-x-4 overflow-x-auto py-2">
-            {tabs.map((tab) => {
+          <div
+            role="tablist"
+            aria-label="Workspace Sections"
+            className="flex space-x-1 sm:space-x-4 overflow-x-auto py-2"
+          >
+            {tabs.map((tab, idx) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
 
               return (
                 <button
                   key={tab.id}
+                  id={`tab-${tab.id}`}
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={`tabpanel-${tab.id}`}
+                  tabIndex={isActive ? 0 : -1}
+                  ref={(el) => {
+                    tabRefs.current[idx] = el;
+                  }}
                   onClick={() => setActiveTab(tab.id as TabType)}
-                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
+                  onKeyDown={(e) => handleTabKeyDown(e, idx)}
+                  className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap focus:outline-hidden focus:ring-2 focus:ring-[#1C3F30] focus:ring-offset-2 ${
                     isActive
                       ? 'bg-[#1C3F30] text-white shadow-xs'
                       : 'text-[#64746D] hover:text-[#1E2922] hover:bg-[#F4EFEB]'
@@ -194,8 +228,14 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
 
       {/* Main Tab Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Screen/Interactive View */}
-        <div className="no-print">
+        {/* Screen/Interactive View with WAI-ARIA Tabpanel */}
+        <div
+          role="tabpanel"
+          id={`tabpanel-${activeTab}`}
+          aria-labelledby={`tab-${activeTab}`}
+          tabIndex={0}
+          className="no-print focus:outline-hidden"
+        >
           {activeTab === 'overview' && (
             <OverviewTab event={event} onNavigateTab={(t) => setActiveTab(t as TabType)} />
           )}
