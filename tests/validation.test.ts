@@ -182,4 +182,49 @@ describe('Validation Schemas (Zod)', () => {
     const result = RefinePlanSchema.safeParse(invalidTypePayload);
     expect(result.success).toBe(false);
   });
+
+  it('rejects refinement requests with invalid eventType, date format, or sub-100 budget in eventDetails', () => {
+    const demo = createDefaultDemoEvent();
+    const basePayload = {
+      modificationType: 'budget-friendly',
+      eventDetails: {
+        name: demo.name,
+        eventType: 'invalid-event-type', // Invalid enum
+        date: demo.date,
+        location: demo.location,
+        guestCount: demo.guestCount,
+        totalBudget: demo.totalBudget,
+        currency: demo.currency,
+        styleTheme: demo.styleTheme,
+        venueType: demo.venueType,
+        atmosphere: demo.atmosphere,
+      },
+      currentPlan: demo.plan,
+    };
+
+    expect(RefinePlanSchema.safeParse(basePayload).success).toBe(false);
+
+    // Invalid date format
+    const badDatePayload = {
+      ...basePayload,
+      eventDetails: {
+        ...basePayload.eventDetails,
+        eventType: 'wedding',
+        date: '25-12-2026', // Not YYYY-MM-DD
+      },
+    };
+    expect(RefinePlanSchema.safeParse(badDatePayload).success).toBe(false);
+
+    // Sub-100 budget
+    const lowBudgetPayload = {
+      ...basePayload,
+      eventDetails: {
+        ...basePayload.eventDetails,
+        eventType: 'wedding',
+        date: '2026-12-25',
+        totalBudget: 50, // Min is 100
+      },
+    };
+    expect(RefinePlanSchema.safeParse(lowBudgetPayload).success).toBe(false);
+  });
 });

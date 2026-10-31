@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   MemoryRateLimitStore,
+  UpstashRedisRateLimitStore,
   checkRateLimit,
   getClientIdentifier,
   RATE_LIMIT_POLICIES,
+  RateLimitStore,
 } from '@/lib/security/rateLimiter';
 
 describe('Server-Side Rate Limiter', () => {
@@ -77,22 +79,106 @@ describe('Server-Side Rate Limiter', () => {
     expect(allowedAfterExpiry.remaining).toBe(1);
   });
 
+  it('enforces strict hard bounds via LRU eviction to prevent unbounded memory growth', async () => {
+    const smallStore = new MemoryRateLimitStore(10);
+    const config = { maxRequests: 5, windowSeconds: 60, name: 'test-bounded' };
+    const now = 1000000;
+
+    // Insert 25 distinct active client keys
+    for (let i = 1; i <= 25; i++) {
+      await smallStore.check(`client-${i}`, config.maxRequests, config.windowSeconds, now + i * 10);
+    }
+
+    // Capacity must never exceed maxKeys (10)
+    const capacity = smallStore.getCapacity();
+    expect(capacity.currentKeys).toBeLessThanOrEqual(10);
+    expect(capacity.maxKeys).toBe(10);
+  });
+
+  it('provides native UpstashRedisRateLimitStore using atomic REST pipeline', async () => {
+    const mockFetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const body = JSON.parse(init?.body as string);
+      // First pipeline call queries count and oldest timestamp
+      if (body[0][0] === 'ZREMRANGEBYSCORE') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            { result: 0 },
+            { result: 1 }, // 1 existing hit
+            { result: ['oldest-member', '1000000'] },
+          ],
+        };
+      }
+      return { ok: true, status: 200, json: async () => [{ result: 1 }] };
+    });
+
+    const upstashStore = new UpstashRedisRateLimitStore(
+      'https://example-upstash.upstash.io',
+      'test-token',
+      mockFetch as unknown as typeof fetch
+    );
+
+    const config = { maxRequests: 3, windowSeconds: 60, name: 'upstash-test' };
+    const res = await upstashStore.check('upstash-client', config.maxRequests, config.windowSeconds, 1000050);
+
+    expect(res.success).toBe(true);
+    expect(res.limit).toBe(3);
+    expect(res.remaining).toBe(1);
+    expect(res.limiterBackend).toBe('upstash-redis');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('handles fail-closed safety policy when rate limit backend encounters an error', async () => {
+    const failingStore: RateLimitStore = {
+      check: async () => {
+        throw new Error('Connection refused to redis host');
+      },
+      reset: () => {},
+    };
+
+    const originalFailClosed = process.env.RATE_LIMIT_FAIL_CLOSED;
+    try {
+      process.env.RATE_LIMIT_FAIL_CLOSED = 'true';
+      const config = { maxRequests: 5, windowSeconds: 60, name: 'fail-closed-test' };
+      const res = await checkRateLimit('client-fail', config, failingStore, 1000000);
+
+      // Must fail closed to prevent quota exhaustion
+      expect(res.success).toBe(false);
+      expect(res.limiterFailure).toBe(true);
+      expect(res.retryAfterSeconds).toBe(60);
+    } finally {
+      process.env.RATE_LIMIT_FAIL_CLOSED = originalFailClosed;
+    }
+  });
+
+  it('extracts client IP safely from trusted proxy headers without spoofing vulnerabilities', () => {
+    // 1. Vercel trusted header
+    const hVercel = new Headers({ 'x-vercel-forwarded-for': '203.0.113.50, 10.0.0.1' });
+    expect(getClientIdentifier(hVercel)).toBe('203.0.113.50');
+
+    // 2. Cloudflare connecting IP
+    const hCf = new Headers({ 'cf-connecting-ip': '198.51.100.22' });
+    expect(getClientIdentifier(hCf)).toBe('198.51.100.22');
+
+    // 3. X-Real-IP
+    const hReal = new Headers({ 'x-real-ip': '198.51.100.42' });
+    expect(getClientIdentifier(hReal)).toBe('198.51.100.42');
+
+    // 4. X-Forwarded-For with proxy hops (picks nearest verified hop instead of spoofable leftmost)
+    const hForwarded = new Headers({ 'x-forwarded-for': 'spoofed.attacker.ip, 192.0.2.1' });
+    expect(getClientIdentifier(hForwarded)).toBe('192.0.2.1');
+
+    // 5. Fallback for local
+    const hEmpty = new Headers();
+    expect(getClientIdentifier(hEmpty)).toBe('127.0.0.1');
+  });
+
   it('enforces distinct policies for generate (5/min) vs refine (10/min)', () => {
     expect(RATE_LIMIT_POLICIES.GENERATE_PLAN.maxRequests).toBe(5);
     expect(RATE_LIMIT_POLICIES.GENERATE_PLAN.windowSeconds).toBe(60);
 
     expect(RATE_LIMIT_POLICIES.REFINE_PLAN.maxRequests).toBe(10);
     expect(RATE_LIMIT_POLICIES.REFINE_PLAN.windowSeconds).toBe(60);
-  });
-
-  it('extracts client IP from proxy headers safely', () => {
-    const h1 = new Headers({ 'x-forwarded-for': '203.0.113.195, 70.41.3.18, 150.172.238.178' });
-    expect(getClientIdentifier(h1)).toBe('203.0.113.195');
-
-    const h2 = new Headers({ 'x-real-ip': '198.51.100.42' });
-    expect(getClientIdentifier(h2)).toBe('198.51.100.42');
-
-    const h3 = new Headers();
-    expect(getClientIdentifier(h3)).toBe('127.0.0.1');
   });
 });

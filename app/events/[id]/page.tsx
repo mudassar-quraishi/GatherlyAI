@@ -12,6 +12,7 @@ import IdeasTab from '@/components/workspace/IdeasTab';
 import { EventDetails } from '@/types/event';
 import { eventStorage } from '@/lib/storage/eventStorage';
 import { generateSamplePlan } from '@/lib/ai/sampleProvider';
+import { calculateReadinessScore } from '@/lib/readiness/calculator';
 import {
   LayoutDashboard,
   DollarSign,
@@ -41,6 +42,21 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Persistent workspace-level readiness score tracking across all tab switches
+  const readiness = event ? calculateReadinessScore(event) : null;
+  const [readinessAnnouncement, setReadinessAnnouncement] = useState<string>('');
+  const prevScoreRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!readiness) return;
+    // Suppress announcement on initial page load; only announce meaningful runtime changes
+    if (prevScoreRef.current !== null && prevScoreRef.current !== readiness.score) {
+      const msg = `Event preparation readiness updated to ${readiness.score} percent, ${readiness.rating.replace('-', ' ')}.`;
+      setReadinessAnnouncement(msg);
+    }
+    prevScoreRef.current = readiness.score;
+  }, [readiness?.score, readiness?.rating]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -228,37 +244,82 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
 
       {/* Main Tab Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Screen/Interactive View with WAI-ARIA Tabpanel */}
+        {/* Dedicated Screen Reader Live Announcement Region: Persistent across all tabs */}
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+          id="workspace-readiness-announcement"
+        >
+          {readinessAnnouncement}
+        </div>
+
+        {/* Screen/Interactive View with WAI-ARIA Tabpanels: All 6 panels exist in the DOM */}
         <div
           role="tabpanel"
-          id={`tabpanel-${activeTab}`}
-          aria-labelledby={`tab-${activeTab}`}
-          tabIndex={0}
+          id="tabpanel-overview"
+          aria-labelledby="tab-overview"
+          tabIndex={activeTab === 'overview' ? 0 : -1}
+          hidden={activeTab !== 'overview'}
           className="no-print focus:outline-hidden"
         >
-          {activeTab === 'overview' && (
-            <OverviewTab event={event} onNavigateTab={(t) => setActiveTab(t as TabType)} />
-          )}
+          <OverviewTab event={event} onNavigateTab={(t) => setActiveTab(t as TabType)} />
+        </div>
 
-          {activeTab === 'budget' && (
-            <BudgetTab event={event} onUpdateEvent={handleUpdateEvent} />
-          )}
+        <div
+          role="tabpanel"
+          id="tabpanel-budget"
+          aria-labelledby="tab-budget"
+          tabIndex={activeTab === 'budget' ? 0 : -1}
+          hidden={activeTab !== 'budget'}
+          className="no-print focus:outline-hidden"
+        >
+          <BudgetTab event={event} onUpdateEvent={handleUpdateEvent} />
+        </div>
 
-          {activeTab === 'timeline' && (
-            <TimelineTab event={event} onUpdateEvent={handleUpdateEvent} />
-          )}
+        <div
+          role="tabpanel"
+          id="tabpanel-timeline"
+          aria-labelledby="tab-timeline"
+          tabIndex={activeTab === 'timeline' ? 0 : -1}
+          hidden={activeTab !== 'timeline'}
+          className="no-print focus:outline-hidden"
+        >
+          <TimelineTab event={event} onUpdateEvent={handleUpdateEvent} />
+        </div>
 
-          {activeTab === 'vendors' && (
-            <VendorsTab event={event} onUpdateEvent={handleUpdateEvent} />
-          )}
+        <div
+          role="tabpanel"
+          id="tabpanel-vendors"
+          aria-labelledby="tab-vendors"
+          tabIndex={activeTab === 'vendors' ? 0 : -1}
+          hidden={activeTab !== 'vendors'}
+          className="no-print focus:outline-hidden"
+        >
+          <VendorsTab event={event} onUpdateEvent={handleUpdateEvent} />
+        </div>
 
-          {activeTab === 'schedule' && (
-            <ScheduleTab event={event} onUpdateEvent={handleUpdateEvent} />
-          )}
+        <div
+          role="tabpanel"
+          id="tabpanel-schedule"
+          aria-labelledby="tab-schedule"
+          tabIndex={activeTab === 'schedule' ? 0 : -1}
+          hidden={activeTab !== 'schedule'}
+          className="no-print focus:outline-hidden"
+        >
+          <ScheduleTab event={event} onUpdateEvent={handleUpdateEvent} />
+        </div>
 
-          {activeTab === 'ideas' && (
-            <IdeasTab event={event} onUpdateEvent={handleUpdateEvent} />
-          )}
+        <div
+          role="tabpanel"
+          id="tabpanel-ideas"
+          aria-labelledby="tab-ideas"
+          tabIndex={activeTab === 'ideas' ? 0 : -1}
+          hidden={activeTab !== 'ideas'}
+          className="no-print focus:outline-hidden"
+        >
+          <IdeasTab event={event} onUpdateEvent={handleUpdateEvent} />
         </div>
 
         {/* Print Layout (All sections rendered seamlessly in print mode) */}

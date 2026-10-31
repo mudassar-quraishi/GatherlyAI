@@ -155,8 +155,8 @@ flowchart TD
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/gatherly-ai.git
-   cd gatherly-ai
+   git clone https://github.com/mudassar-quraishi/GatherlyAI.git
+   cd GatherlyAI
    ```
 
 2. **Install dependencies:**
@@ -172,6 +172,10 @@ flowchart TD
    ```env
    GEMINI_API_KEY=your_gemini_api_key_here
    GEMINI_MODEL=gemini-2.5-flash
+
+   # Optional: Distributed Production Rate Limiter (Upstash Redis)
+   UPSTASH_REDIS_REST_URL=https://your-upstash-redis.upstash.io
+   UPSTASH_REDIS_REST_TOKEN=your_upstash_token_here
    ```
 
 4. **Start Development Server:**
@@ -220,7 +224,34 @@ Gatherly AI provides a first-class **Deterministic Demo Mode**:
 ```bash
 npm run test
 ```
-Runs 24 tests across 6 suites validating budget math, calendar timezone safety, Zod schemas, localStorage persistence, and sample generators.
+Executes **44 unit and integration tests across 8 suites** in Vitest:
+- Budget integer math & contingency calculations (`tests/budget.test.ts`)
+- Calendar timezone-safe timeline anchoring & acceleration (`tests/timeline.test.ts`)
+- Strict Zod schemas for generation & refinement (`tests/validation.test.ts`)
+- Storage CRUD & multi-event data isolation (`tests/storage.test.ts`)
+- Deterministic demo plan generation (`tests/ai-integration.test.ts`)
+- Readiness score formulas (`tests/readiness.test.ts`)
+- Distributed & bounded rate limiting with fail-closed safety (`tests/rate-limiter.test.ts`)
+- WAI-ARIA runtime tab & screen-reader live announcements (`tests/accessibility.test.ts`)
+
+### End-to-End Browser Regression Tests (Playwright)
+```bash
+npm run test:e2e
+```
+Executes **10 end-to-end browser scenarios** in headless Chromium on `http://localhost:3005`.
+> **Clean-Checkout Note:** The test command includes an automated `pretest:e2e` hook that runs `npm run build` so tests never fail due to missing `.next` production bundles on clean checkouts.
+
+Key scenarios verified:
+1. Dashboard loads and preloads sample celebration.
+2. Event creation wizard enforces required fields and creates event.
+3. Budget allocations & spent amounts update and persist across page reload.
+4. Timeline task toggles update status, trigger live screen-reader readiness updates, and persist.
+5. Vendor checklist status and notes edit and persist across reload.
+6. Workspace navigation implements full WAI-ARIA tablist semantics, tabpanel relationships, and Arrow key navigation.
+7. Backup JSON export verifies downloaded payload structure and event properties.
+8. Multi-event isolation verifies independent budgets without cross-contamination.
+9. Invalid form inputs display accessible errors without exposing credentials.
+10. Mobile viewport (375x667) verifies zero horizontal overflow (`scrollWidth <= innerWidth`).
 
 ### TypeScript Type Checking
 ```bash
@@ -251,6 +282,8 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 3. In **Environment Variables**, add:
    - `GEMINI_API_KEY`: *(Your Google AI Studio API key)*
    - `GEMINI_MODEL`: `gemini-2.5-flash`
+   - `UPSTASH_REDIS_REST_URL`: *(Optional: Distributed Upstash Redis URL)*
+   - `UPSTASH_REDIS_REST_TOKEN`: *(Optional: Distributed Upstash Redis Token)*
 4. Click **Deploy**.
 5. Vercel automatically builds the Next.js App Router application and provides a fast global edge deployment.
 
@@ -258,10 +291,13 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 
 ## 11. Security, Reliability & Privacy
 
+- **Distributed Production Rate Limiting:** Server-side rate limiter supports distributed Redis via Upstash REST pipelines (`UpstashRedisRateLimitStore`) for multi-instance/serverless deployments.
+- **Fail-Closed Safety Policy:** If rate-limiting infrastructure becomes unavailable while live Gemini AI is enabled, endpoints fail safely (HTTP 503) rather than bypassing protection and risking quota exhaustion. Rejected requests never reach the Gemini provider.
+- **Hard-Bounded In-Memory Store:** The local in-memory fallback uses strict LRU eviction (`while (size >= maxKeys) delete oldestKey`), ensuring memory usage never exceeds configured boundaries.
+- **Spoof-Resistant Client Identification:** Client IP extraction prioritizes platform ingress headers (`x-vercel-forwarded-for`, `cf-connecting-ip`, `x-real-ip`) and inspects reverse-proxy hops rather than blindly trusting spoofable leftmost headers.
 - **No Public API Key Exposure:** The Gemini API key is read solely server-side via `process.env.GEMINI_API_KEY`. It is never exposed in client bundles or network responses.
-- **Server-Side Input Validation:** All API requests pass through Zod schemas with bounded numerical limits, guest count checks (1–50,000), date regex, and string length caps.
+- **Server-Side Input Validation:** All API requests pass through strict Zod schemas with bounded numerical limits, guest count checks (1–50,000), date regex, and string length caps.
 - **Zero Third-Party Database PII:** User celebration data remains strictly inside the user's browser `localStorage`. No personal guest names or contact information are stored on external databases.
-- **Graceful Error Handling:** If Gemini API experiences rate limits or timeouts, the server returns an informative message and falls back to our curated demo provider rather than crashing.
 
 ---
 
@@ -279,5 +315,5 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 - [x] **Walkthrough Demo Video Script:** Complete 3:40 script in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
 - [x] **No Login Required:** Accessible to evaluators immediately with 1-click demo preloading.
 - [x] **Genuine Functionality:** Editable budgets, task toggles, vendor statuses, schedule editor, AI plan generation & refinement.
-- [x] **Code Quality & Testing:** 24/24 Vitest tests passing, 0 TypeScript errors, 0 ESLint warnings.
+- [x] **Code Quality & Testing:** 44/44 Vitest tests passing across 8 suites, 10/10 Playwright E2E browser tests passing, 0 TypeScript errors, 0 ESLint warnings.
 - [x] **Problem Statement Alignment:** Weddings, birthdays, and community events with budgets, timelines, vendors, and ideas.

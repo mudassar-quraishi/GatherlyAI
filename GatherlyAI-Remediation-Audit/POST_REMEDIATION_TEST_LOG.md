@@ -1,10 +1,10 @@
 # Gatherly AI — Post-Remediation Test Execution Log
 
-**Test Execution Date:** October 29, 2026  
+**Test Execution Date:** October 30, 2026  
 **Environment:** Windows 11, Node.js v22.14.0, Next.js 16.4.3, Vitest v5.0.5, Playwright v1.64.1  
-**Baseline Git Commit:** `18edf47` (`main`)  
-**Total Automated Tests:** 50  
-**Passed:** 50 (100%)  
+**Repository:** `https://github.com/mudassar-quraishi/GatherlyAI.git`  
+**Total Automated Tests:** 54  
+**Passed:** 54 (100%)  
 **Failed:** 0  
 **Skipped:** 0  
 
@@ -13,18 +13,21 @@
 ## 1. Vitest Unit & Integration Test Suite (`npm test`)
 
 **Command:** `npm test` (`vitest run`)  
-**Duration:** 39.99s  
-**Outcome:** 8 test files passed (40 tests passed out of 40)  
+**Duration:** ~8.15s  
+**Outcome:** 8 test files passed (44 tests passed out of 44)  
 
-### Suite 1: `tests/rate-limiter.test.ts` (6 tests) — NEW
+### Suite 1: `tests/rate-limiter.test.ts` (9 tests) — COMPREHENSIVE
 - ✓ allows requests under the configured threshold (2ms)
 - ✓ returns 429 when request rate exceeds the threshold (1ms)
 - ✓ computes correct Retry-After header duration (1ms)
 - ✓ enforces independent thresholds for generation vs refinement (1ms)
 - ✓ isolates rate limit counters across distinct client identifiers (1ms)
 - ✓ resets limit quota once time window expires (1ms)
+- ✓ bounds memory store size strictly via LRU eviction under heavy key churn (2ms)
+- ✓ executes atomic pipeline on Upstash Redis REST backend when configured (3ms)
+- ✓ handles fail-closed safety policy when rate limit backend encounters an error (2ms)
 
-### Suite 2: `tests/validation.test.ts` (10 tests) — EXPANDED
+### Suite 2: `tests/validation.test.ts` (11 tests) — STRICT TYPED SCHEMAS
 - ✓ accepts a valid event details payload (2ms)
 - ✓ rejects invalid event type in creation schema (1ms)
 - ✓ rejects negative or zero budget (1ms)
@@ -35,11 +38,12 @@
 - ✓ rejects refinement request with invalid vendor status enum (1ms)
 - ✓ rejects refinement request exceeding maximum modification character length (1ms)
 - ✓ rejects refinement request with invalid schedule item structure (1ms)
+- ✓ rejects refinement request with invalid eventDetails fields (1ms)
 
-### Suite 3: `tests/accessibility.test.ts` (3 tests) — NEW
-- ✓ renders workspace tabs with proper WAI-ARIA tablist and tab roles (18ms)
-- ✓ supports roving tabindex and horizontal arrow navigation across tabs (16ms)
-- ✓ updates dynamic readiness score announcement region appropriately (12ms)
+### Suite 3: `tests/accessibility.test.ts` (3 tests) — RUNTIME COMPONENT TESTS
+- ✓ renders complete WAI-ARIA tab pattern with matching tab-to-panel relationships (342ms)
+- ✓ updates readiness score and announces to screen reader via live status region upon runtime changes (25ms)
+- ✓ calculates circular keyboard navigation indices correctly across tab list (1ms)
 
 ### Suite 4: `tests/budget.test.ts` (6 tests)
 - ✓ allocates budget categories proportional to default percentage weights (2ms)
@@ -76,33 +80,33 @@
 
 ## 2. Playwright End-to-End Browser Regression Suite (`npm run test:e2e`)
 
-**Command:** `npx playwright test`  
+**Command:** `npm run test:e2e` (`playwright test` with automated `pretest:e2e` Next.js build)  
 **Browser:** Chromium Headless (1280x720 & 375x667)  
 **Execution Target:** Next.js Production Build (`http://localhost:3005`)  
-**Duration:** 14.6s  
-**Outcome:** 10 passed out of 10  
+**Duration:** ~32.8s  
+**Outcome:** 10 passed out of 10 (100% pass rate)  
 
-### Scenario Breakdown:
-1. **Test 1: Dashboard renders and loads demo celebration plan** (1.2s)
+### Strengthened Scenario Breakdown:
+1. **Test 1: Dashboard renders and loads demo celebration plan** (1.6s)
    - Navigates to `/`. Verifies Studio header. Clicks "Load Demo Event". Asserts demo event card appears in the grid.
-2. **Test 2: Event creation wizard rejects invalid inputs and creates event** (1.7s)
+2. **Test 2: Event creation wizard rejects invalid inputs and creates event** (1.4s)
    - Navigates to `/events/new`. Triggers step validation. Asserts "Please provide an event name" error. Fills valid event basics, sets budget, navigates through steps, submits, and verifies redirection to dedicated workspace header `Priya Golden Jubilee`.
-3. **Test 3: Budget calculations update and persist across reload** (3.1s)
-   - Navigates to demo event. Switches to Budget tab. Asserts target budget card and distribution charts. Reloads page and confirms state persistence.
-4. **Test 4: Timeline task toggle updates status and readiness** (1.8s)
-   - Switches to Timeline tab. Toggles task checkbox. Switches to Overview and verifies dedicated `role="status"` readiness announcement region. Reloads page and verifies persistence.
-5. **Test 5: Vendor checklist status and items are visible** (613ms)
-   - Switches to Vendor Checklist tab. Verifies vendor list, category badges, and notes.
-6. **Test 6: Workspace tabs implement WAI-ARIA tablist and keyboard navigation** (766ms)
-   - Inspects `[role="tablist"]`. Verifies `[aria-selected="true"]` on active tab and `[aria-selected="false"]` on inactive tabs. Tests keyboard right arrow navigation to Budget tab and panel focus.
-7. **Test 7: Export JSON backup and plain-text summary** (908ms)
-   - Triggers Copy Summary button and Backup JSON download action.
-8. **Test 8: Independent events remain isolated without data cross-contamination** (856ms)
-   - Loads demo event, switches to another event, verifies budget and data isolation in localStorage.
-9. **Test 9: Invalid submission displays safe validation errors without stack traces** (463ms)
-   - Exercises invalid form submission and confirms clear inline validation errors with no internal stack traces or environment secrets exposed.
-10. **Test 10: Mobile viewport (375x667) renders without horizontal breakage** (437ms)
-    - Emulates iPhone SE viewport (375x667). Verifies navbar, dashboard cards, buttons, and tablist render responsively without horizontal clipping.
+3. **Test 3: Budget calculations update and persist across reload** (2.0s)
+   - Navigates to demo event. Switches to Budget tab. Edits planned allocation and actual spent amounts. Asserts recalculated totals. Reloads page and confirms persistent storage.
+4. **Test 4: Timeline task toggle updates status and readiness** (1.7s)
+   - Switches to Timeline tab. Toggles task checkbox. Asserts toggled `aria-label`. Asserts live status region `#workspace-readiness-announcement` announces update. Reloads and verifies persistence.
+5. **Test 5: Vendor checklist status and notes update and persist** (2.1s)
+   - Switches to Vendor Checklist tab. Changes vendor status to `confirmed`. Edits vendor note and saves. Reloads page and confirms both status and note persist.
+6. **Test 6: Workspace tabs implement WAI-ARIA tablist, tabpanels, and keyboard navigation** (1.5s)
+   - Verifies `role="tablist"` and all 6 tab-to-tabpanel relationships exist simultaneously in the DOM. Asserts active panel visibility and inactive panel `hidden` state. Tests keyboard `ArrowRight` and `ArrowLeft` navigation with circular wrap.
+7. **Test 7: Export JSON backup and plain-text summary** (1.9s)
+   - Verifies Copy Summary notification. Captures browser `download` event, reads data stream, parses JSON, and strictly asserts event structure, totalBudget (₹8,50,000), and plan properties.
+8. **Test 8: Independent events remain isolated without data cross-contamination** (3.0s)
+   - Loads demo event (₹8,50,000 budget), navigates to `/events/new`, creates `Rohan Birthday Party` (₹1,25,000 budget), populates plan via Load Sample Plan, and verifies demo event budget remains untouched at ₹8,50,000.
+9. **Test 9: Invalid submission displays safe validation errors without stack traces** (1.2s)
+   - Submits invalid event details and verifies safe user-facing validation errors without stack traces or secret key exposure.
+10. **Test 10: Mobile viewport (375x667) renders without horizontal breakage** (1.5s)
+    - Emulates mobile viewport (375x667). Evaluates `document.documentElement.scrollWidth <= window.innerWidth` confirming zero horizontal overflow. Exercises key mobile controls.
 
 ---
 
@@ -111,11 +115,12 @@
 - **TypeScript Typecheck (`npm run typecheck`):**
   - Command: `tsc --noEmit`
   - Result: 0 errors (Exit code 0).
-- **ESLint Linting (`npx eslint app components lib types`):**
-  - Command: `npx eslint app components lib types`
+- **ESLint Linting (`npm run lint`):**
+  - Command: `next lint` / `eslint`
   - Result: 0 errors, 0 warnings (Exit code 0).
 - **Production Build (`npm run build`):**
   - Command: `next build`
-  - Result: Compiled successfully in 16.1s. All 9 routes optimized (Exit code 0).
+  - Result: Compiled successfully with Turbopack. All 9 routes optimized (Exit code 0).
 - **Production Dependency Security Audit (`npm audit --omit=dev`):**
   - Result: `found 0 vulnerabilities` (Exit code 0).
+

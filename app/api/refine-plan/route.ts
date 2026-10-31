@@ -11,14 +11,17 @@ export async function POST(req: NextRequest) {
     const rateLimit = await checkRateLimit(clientId, RATE_LIMIT_POLICIES.REFINE_PLAN);
 
     if (!rateLimit.success) {
+      const status = rateLimit.limiterFailure ? 503 : 429;
       return NextResponse.json(
         {
-          error: 'Too Many Requests',
-          message: `Rate limit exceeded. Please wait ${rateLimit.retryAfterSeconds}s before refining your plan again.`,
+          error: rateLimit.limiterFailure ? 'Service Temporarily Unavailable' : 'Too Many Requests',
+          message: rateLimit.limiterFailure
+            ? 'Rate limit protection is currently unavailable. Live AI operations are protected. Please retry shortly.'
+            : `Rate limit exceeded. Please wait ${rateLimit.retryAfterSeconds}s before refining your plan again.`,
           retryAfter: rateLimit.retryAfterSeconds,
         },
         {
-          status: 429,
+          status,
           headers: {
             'Retry-After': String(rateLimit.retryAfterSeconds),
             'X-RateLimit-Limit': String(rateLimit.limit),

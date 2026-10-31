@@ -25,18 +25,6 @@ export default function OverviewTab({ event, onNavigateTab }: OverviewTabProps) 
   const categories = plan?.budgetBreakdown.categories || [];
   const budgetHealth = calculateBudgetHealth(event.totalBudget, categories);
 
-  const [announcement, setAnnouncement] = useState<string>('');
-  const prevScoreRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    // Only announce meaningful changes after initial mount
-    if (prevScoreRef.current !== null && prevScoreRef.current !== readiness.score) {
-      const msg = `Event preparation readiness updated to ${readiness.score} percent, ${readiness.rating.replace('-', ' ')}.`;
-      setAnnouncement(msg);
-    }
-    prevScoreRef.current = readiness.score;
-  }, [readiness.score, readiness.rating]);
-
   const tasks = plan?.timelineTasks || [];
   const upcomingTasks = tasks
     .filter((t) => t.status !== 'done')
@@ -44,15 +32,6 @@ export default function OverviewTab({ event, onNavigateTab }: OverviewTabProps) 
 
   return (
     <div className="space-y-6">
-      {/* Dedicated Screen Reader Live Announcement Region */}
-      <div
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="sr-only"
-      >
-        {announcement}
-      </div>
 
       {/* AI Event Summary Banner */}
       {plan && (
