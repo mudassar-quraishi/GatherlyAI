@@ -19,6 +19,10 @@ test.describe('Gatherly AI End-to-End Regression Suite', () => {
   test('Test 2: Event creation wizard rejects invalid inputs and creates event', async ({ page }) => {
     await page.goto('/events/new');
 
+    const eventTypeGroup = page.getByRole('group', { name: 'Celebration Type *' });
+    await expect(eventTypeGroup).toBeVisible();
+    await expect(eventTypeGroup.getByRole('button').first()).toHaveAttribute('aria-pressed', /^(true|false)$/);
+
     // Verify step 1 title
     await expect(page.locator('h2:has-text("Tell us about your celebration")')).toBeVisible();
 
@@ -58,6 +62,7 @@ test.describe('Gatherly AI End-to-End Regression Suite', () => {
   // Test 3: Budget calculations, inline editing, and persistence across reload
   test('Test 3: Budget calculations update and persist across reload', async ({ page }) => {
     await page.goto('/events/demo-event-wedding-2026');
+    await expect(page.getByText('Live Gemini sends event details to Google when you generate a plan.')).toBeVisible();
 
     // Navigate to Budget tab
     await page.click('#tab-budget');
@@ -196,7 +201,12 @@ test.describe('Gatherly AI End-to-End Regression Suite', () => {
   test('Test 7: Export JSON backup and plain-text summary', async ({ page }) => {
     await page.goto('/events/demo-event-wedding-2026');
 
+    await page.click('#tab-ideas');
+    await expect(page.getByText(/event context, your current plan summary, budget categories, and refinement request are sent to Google/i)).toBeVisible();
+    await expect(page.getByLabel('Custom Refinement Instruction')).toHaveAttribute('maxlength', '600');
+
     // Trigger copy summary
+    await page.click('#tab-overview');
     await page.click('button:has-text("Copy Summary")');
     await expect(page.locator('text=Copied!')).toBeVisible();
 

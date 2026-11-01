@@ -19,7 +19,8 @@ Gatherly AI is a GenAI-powered celebration and event planning assistant built fo
 10. [Deployment Guide (Vercel)](#10-deployment-guide-vercel)
 11. [Security, Reliability & Privacy](#11-security-reliability--privacy)
 12. [Known Limitations](#12-known-limitations)
-13. [Hackathon Submission Checklist](#13-hackathon-submission-checklist)
+13. [Assumptions](#13-assumptions)
+14. [Hackathon Submission Checklist](#14-hackathon-submission-checklist)
 
 ---
 
@@ -27,6 +28,8 @@ Gatherly AI is a GenAI-powered celebration and event planning assistant built fo
 
 **Official Brief:**
 > "Celebration & Event Planner: Create a GenAI-powered planning assistant that helps users organize weddings, birthdays, and community events with budgets, timelines, vendor checklists, and personalized ideas."
+
+**Chosen challenge vertical:** Celebration & Event Planner.
 
 **Our Solution:**
 Planning significant personal and community celebrations usually collapses into fragmented spreadsheets, unverified estimates, and panic. Generic LLMs merely generate walls of text that lack numerical consistency and calendar awareness.
@@ -108,7 +111,7 @@ Gatherly AI pairs **Google Gemini GenAI** with **deterministic application logic
 - **Icons:** Lucide React
 - **GenAI SDK:** Google's official `@google/genai` SDK (`gemini-2.5-flash`)
 - **Validation:** Zod 4 for strict server-side request/response schema validation
-- **Persistence:** Browser `localStorage` with resilient error handling and zero server-side PII storage
+- **Persistence:** Browser `localStorage`; event data is sent to the app API when a user requests AI generation or refinement
 - **Test Runner:** Vitest 5 with `@testing-library/react` and `jsdom`
 
 ---
@@ -124,16 +127,16 @@ flowchart TD
     
     Workspace -->|4. Request Plan| API["Next.js Route /api/generate-plan"]
     
-    API -->|5. Check GEMINI_API_KEY| Decision{API Key Available?}
+    API -->|5. Validate request and check key| Decision{API Key Available?}
     
     Decision -->|Yes| Gemini["Google Gemini 2.5 Flash (@google/genai)"]
     Decision -->|No / Rate Limited| DemoEngine[Deterministic Sample Provider]
     
-    Gemini -->|Validates JSON Output| ZodSchema[Zod Schema Validation]
+    Gemini -->|Structured response| ZodSchema[Zod Schema Validation]
     ZodSchema --> EngineNormalization[Budget & Timeline Normalizers]
     DemoEngine --> EngineNormalization
     
-    EngineNormalization -->|Integer Minor Units & Safe Dates| Storage
+    EngineNormalization -->|Integer minor units and safe dates| Storage
     Storage -->|Renders State| UIComponents["Workspace Tabs (Budget, Timeline, Vendors, Schedule, Ideas)"]
     
     User -->|6. Interactive Edits| UIComponents
@@ -206,7 +209,7 @@ Gatherly AI uses the official Google GenAI SDK (`@google/genai`).
    ```
 4. Restart your development or production server.
 5. In Gatherly AI, the top navigation bar will show a green **Gemini 2.5 Active** pill.
-6. The key is accessed exclusively server-side in API routes and is **never** leaked to client-side bundles or network payloads.
+6. The key is accessed only by server-side code and is never included in browser bundles or browser API responses.
 
 ---
 
@@ -221,26 +224,33 @@ Gatherly AI provides a first-class **Deterministic Demo Mode**:
 
 ## 9. Running Tests, Linting & Production Build
 
+### Run the Full Verification Sequence
+```bash
+npm run verify
+```
+Runs type checking, lint, unit/integration tests, a production build, and the Playwright browser suite. The GitHub Actions workflow runs this same command on pushes and pull requests to `main`.
+See the [current verification record](GatherlyAI-Remediation-Audit/CURRENT_VERIFICATION.md) for the latest run and checks that still require deployment credentials or network access.
+
 ### Unit & Integration Tests (Vitest)
 ```bash
 npm run test
 ```
-Executes **56 unit and integration tests across 8 suites** in Vitest:
+Executes **66 unit and integration tests across 9 suites** in Vitest:
 - Budget integer math & contingency calculations (`tests/budget.test.ts`)
 - Calendar timezone-safe timeline anchoring & acceleration (`tests/timeline.test.ts`)
 - Strict Zod schemas for generation & refinement (`tests/validation.test.ts`)
 - Storage CRUD & multi-event data isolation (`tests/storage.test.ts`)
-- Deterministic demo plan generation (`tests/ai-integration.test.ts`)
+- Deterministic demo plan generation and provider-error redaction (`tests/ai-integration.test.ts`)
 - Readiness score formulas (`tests/readiness.test.ts`)
 - Atomic Lua Redis rate limiting, 30-request concurrency race tests & fail-closed safety (`tests/rate-limiter.test.ts`)
 - WAI-ARIA runtime tab & screen-reader live announcements (`tests/accessibility.test.ts`)
+- API route behavior, malformed JSON handling, and deterministic responses (`tests/api-routes.test.ts`)
 
 ### End-to-End Browser Regression Tests (Playwright)
 ```bash
 npm run test:e2e
 ```
-Executes **10 end-to-end browser scenarios** in headless Chromium on `http://localhost:3005`.
-> **Clean-Checkout Note:** The test command includes an automated `pretest:e2e` hook that runs `npm run build` so tests never fail due to missing `.next` production bundles on clean checkouts.
+Executes **10 end-to-end browser scenarios** in headless Chromium against a production build on `http://localhost:3005`. The npm pretest hook builds first; the runner starts and cleans up the server so the command exits reliably on Windows.
 
 Key scenarios verified:
 1. Dashboard loads and preloads sample celebration.
@@ -264,7 +274,7 @@ Executes `tsc --noEmit` across all App Router routes and modules with zero type 
 ```bash
 npm run lint
 ```
-Runs Next.js ESLint with 0 errors and 0 warnings.
+Runs ESLint with 0 errors and 0 warnings in the current verified checkout.
 
 ### Production Build
 ```bash
@@ -285,9 +295,9 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
    - `GEMINI_MODEL`: `gemini-2.5-flash`
    - `UPSTASH_REDIS_REST_URL`: *(MANDATORY for live Gemini in production)*
    - `UPSTASH_REDIS_REST_TOKEN`: *(MANDATORY for live Gemini in production)*
-   - `RATE_LIMIT_FAIL_CLOSED`: `true`
+   - `RATE_LIMIT_FAIL_CLOSED`: `true` (recommended)
 4. Click **Deploy**.
-5. Vercel automatically builds the Next.js App Router application and provides a fast global edge deployment.
+5. Vercel builds the Next.js application and provides a hosted URL. Server routes use the platform's configured server runtime.
 
 ---
 
@@ -297,10 +307,11 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 - **Mandatory Production Redis Enforcement:** In production with live Gemini enabled (`NODE_ENV === 'production'` & `GEMINI_API_KEY`), Upstash Redis is strictly mandatory. Silent fallback to an in-memory store is prohibited to prevent multi-instance quota exhaustion.
 - **Fail-Closed Safety Policy:** If rate-limiting infrastructure becomes unavailable or misconfigured in production, endpoints fail safely (HTTP 503) rather than bypassing protection. HTTP status codes and individual Redis command error payloads are rigorously validated.
 - **Hard-Bounded In-Memory Store:** The local in-memory fallback uses strict LRU eviction (`while (size >= maxKeys) delete oldestKey`), ensuring memory usage never exceeds configured boundaries in local development or demo environments.
-- **Spoof-Resistant Client Identification & Anonymous Isolation:** Client IP extraction prioritizes platform ingress headers (`x-vercel-forwarded-for`, `cf-connecting-ip`, `x-real-ip`) and inspects reverse-proxy hops. Unidentified production clients are assigned isolated anonymous fingerprints (`anon-<hash>`) rather than collapsing onto `127.0.0.1`.
+- **Pseudonymous Rate-Limit Keys:** Client identifiers are normalized and hashed before being passed to the rate-limit store. Configure the trusted proxy hop count for your hosting platform; forwarded IP headers are meaningful only when set by a trusted proxy.
 - **No Public API Key Exposure:** The Gemini API key is read solely server-side via `process.env.GEMINI_API_KEY`. It is never exposed in client bundles or network responses.
-- **Server-Side Input Validation:** All API requests pass through strict Zod schemas with bounded numerical limits, guest count checks (1–50,000), date regex, and string length caps.
-- **Zero Third-Party Database PII:** User celebration data remains strictly inside the user's browser `localStorage`. No personal guest names or contact information are stored on external databases.
+- **Server-Side Input Validation:** API requests use Zod schemas with bounded numerical limits, guest-count checks (1–50,000), real calendar-date validation, and string length caps. Malformed JSON receives a 400 response.
+- **Data Handling:** Plans are stored in browser `localStorage`; the app does not persist event records in its own database. Requests go to the hosted app API when users generate or refine a plan. With live Gemini enabled, generation sends event details to Google; refinement sends event context, budget category names, the plan summary, and the user's refinement request. Provider errors are not returned verbatim. Do not enter sensitive personal details into AI prompts.
+- **Rate-Limit Store:** Production live-AI deployments use Upstash Redis to store hashed client keys and request timestamps. This is operational metadata, not event-plan storage.
 
 ---
 
@@ -311,12 +322,23 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 
 ---
 
-## 13. Hackathon Submission Checklist
+## 13. Assumptions
+
+- One organizer manages a plan in one browser profile; there is no login, team collaboration, or cross-device synchronization.
+- The event owner reviews all generated estimates, dates, accessibility suggestions, dietary guidance, and vendor recommendations before acting on them.
+- AI-generated budgets are planning estimates, not quotes or financial advice; supplier availability and prices must be verified directly.
+- Dates are date-only values in the Gregorian calendar. The app does not infer venue time zones.
+- INR is the default display currency. Other supported currency codes change formatting, but do not perform foreign-exchange conversion.
+- Live Gemini is optional. Without a configured key, users can still use deterministic sample plans; live AI requires a Google API key and production rate-limit storage.
+
+---
+
+## 14. Hackathon Submission Checklist
 
 - [x] **Functional Web Application:** Fully runnable locally and Vercel-ready.
-- [x] **Repository Size:** Under 10 MB (Verified source size: **0.724 MB**).
+- [x] **Repository Size:** Current Git history is under 10 MB; recheck after the final submission commit.
 - [x] **Walkthrough Demo Video Script:** Complete 3:40 script in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
 - [x] **No Login Required:** Accessible to evaluators immediately with 1-click demo preloading.
 - [x] **Genuine Functionality:** Editable budgets, task toggles, vendor statuses, schedule editor, AI plan generation & refinement.
-- [x] **Code Quality & Testing:** 56/56 Vitest tests passing across 8 suites, 10/10 Playwright E2E browser tests passing, 0 TypeScript errors, 0 ESLint warnings.
+- [x] **Code Quality & Testing:** 66/66 Vitest tests pass across 9 suites; 10/10 Playwright scenarios pass when run through `npm run test:e2e`; typecheck and lint pass.
 - [x] **Problem Statement Alignment:** Weddings, birthdays, and community events with budgets, timelines, vendors, and ideas.

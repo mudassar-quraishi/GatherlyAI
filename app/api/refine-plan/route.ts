@@ -32,7 +32,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
+    }
 
     const parsed = RefinePlanSchema.safeParse(body);
     if (!parsed.success) {
@@ -79,12 +84,12 @@ export async function POST(req: NextRequest) {
       notice: result.notice,
     });
   } catch (error: unknown) {
-    console.error('[API /api/refine-plan Error]:', error);
-    const message = error instanceof Error ? error.message : 'Internal Server Error';
+    const errorType = error instanceof Error ? error.name : 'UnknownError';
+    console.error(`[API /api/refine-plan Error] ${errorType}`);
     return NextResponse.json(
       {
         error: 'Failed to refine plan',
-        message,
+        message: 'Please try again. If the problem continues, contact support.',
       },
       { status: 500 }
     );

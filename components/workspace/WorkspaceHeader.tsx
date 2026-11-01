@@ -188,6 +188,10 @@ export default function WorkspaceHeader({
               )}
             </button>
 
+            <p className="basis-full max-w-xl text-[11px] leading-4 text-[#64746D]">
+              Live Gemini sends event details to Google when you generate a plan.
+            </p>
+
             {!event.plan && (
               <button
                 onClick={onLoadSamplePlan}

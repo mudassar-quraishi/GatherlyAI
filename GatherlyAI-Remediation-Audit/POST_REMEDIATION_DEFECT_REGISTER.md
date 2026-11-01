@@ -1,8 +1,10 @@
 # Gatherly AI — Post-Remediation Defect Register
 
 **Date:** October 29, 2026  
-**Auditor Roles:** Senior Full-Stack Engineer, AppSec Engineer, Accessibility Specialist, QA Automation Lead  
+**Review Type:** Historical internal self-review
 **Baseline Git Commit:** `18edf47` (`main`)  
+
+> Historical self-review notes from October 29, 2026. The listed resolutions are not an independent audit or a substitute for checking the current checkout. See [CURRENT_VERIFICATION.md](CURRENT_VERIFICATION.md) for current automated results.
 
 ---
 

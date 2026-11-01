@@ -10,8 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run test:e2e",
     "pretest:e2e": "npm run build",
-    "test:e2e": "playwright test"
+    "test:e2e": "node scripts/run-e2e.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.31.0",

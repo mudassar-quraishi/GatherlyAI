@@ -1,9 +1,20 @@
 import { z } from 'zod';
 
+function isValidDateOnly(value: string): boolean {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
+  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day;
+}
+
 export const EventInputSchema = z.object({
   name: z.string().min(2, 'Event name must be at least 2 characters').max(100, 'Event name must not exceed 100 characters'),
   eventType: z.enum(['wedding', 'birthday', 'anniversary', 'community', 'fundraiser', 'other']),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+    .refine(isValidDateOnly, 'Date must be a valid calendar date'),
   duration: z.string().min(2).max(100).default('Full Day (8 hours)'),
   location: z.string().min(2, 'Location is required').max(150),
   guestCount: z.number().int().min(1, 'Guest count must be at least 1').max(50000, 'Guest count must be under 50,000'),

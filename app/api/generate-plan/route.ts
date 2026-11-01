@@ -32,7 +32,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
+    }
 
     // Validate request payload
     const parsed = EventInputSchema.safeParse(body);
@@ -46,11 +51,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const now = new Date().toISOString();
     const eventDetails: EventDetails = {
       ...parsed.data,
-      id: body.id || `event-${Date.now()}`,
-      createdAt: body.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      id: `event-${Date.now()}`,
+      createdAt: now,
+      updatedAt: now,
     };
 
     const result = await generateEventPlanWithAI(eventDetails);
@@ -62,12 +68,12 @@ export async function POST(req: NextRequest) {
       notice: result.notice,
     });
   } catch (error: unknown) {
-    console.error('[API /api/generate-plan Error]:', error);
-    const message = error instanceof Error ? error.message : 'Internal Server Error';
+    const errorType = error instanceof Error ? error.name : 'UnknownError';
+    console.error(`[API /api/generate-plan Error] ${errorType}`);
     return NextResponse.json(
       {
         error: 'Failed to generate plan',
-        message,
+        message: 'Please try again. If the problem continues, contact support.',
       },
       { status: 500 }
     );

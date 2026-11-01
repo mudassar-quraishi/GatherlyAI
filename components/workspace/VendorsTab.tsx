@@ -200,10 +200,11 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
             <form onSubmit={handleAddVendor} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-vendor-category" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Category *
                   </label>
                   <input
+                    id="new-vendor-category"
                     type="text"
                     required
                     placeholder="e.g. Photography, Flowers"
@@ -214,10 +215,11 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-vendor-title" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Title *
                   </label>
                   <input
+                    id="new-vendor-title"
                     type="text"
                     required
                     placeholder="e.g. Drone Filmmaker"
@@ -229,10 +231,11 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                <label htmlFor="new-vendor-need" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                   What You Need
                 </label>
                 <textarea
+                  id="new-vendor-need"
                   rows={2}
                   placeholder="Specific service requirements..."
                   value={newVendor.needDescription}
@@ -242,10 +245,11 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                <label htmlFor="new-vendor-why" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                   Why It Matters
                 </label>
                 <input
+                  id="new-vendor-why"
                   type="text"
                   placeholder="Impact on event experience..."
                   value={newVendor.whyItMatters}
@@ -256,10 +260,11 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-vendor-deadline" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Booking Deadline
                   </label>
                   <input
+                    id="new-vendor-deadline"
                     type="text"
                     placeholder="e.g. 3 weeks before event"
                     value={newVendor.bookingDeadline}
@@ -269,10 +274,11 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-vendor-priority" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Priority
                   </label>
                   <select
+                    id="new-vendor-priority"
                     value={newVendor.priority}
                     onChange={(e) => setNewVendor({ ...newVendor, priority: e.target.value as TaskPriority })}
                     className="w-full px-3 py-1.5 rounded-xl border border-[#E5DFD5] text-xs"
@@ -324,6 +330,7 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
                   </div>
 
                   <select
+                    aria-label={`Status for ${vendor.title}`}
                     value={vendor.status}
                     onChange={(e) => handleStatusChange(vendor.id, e.target.value as VendorStatus)}
                     className={`text-xs font-semibold px-2.5 py-1 rounded-lg border capitalize focus:ring-2 focus:ring-[#1C3F30] ${getStatusBadge(
@@ -366,6 +373,7 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
                   {isEditingNotes ? (
                     <div className="space-y-2">
                       <textarea
+                        aria-label={`Notes for ${vendor.title}`}
                         rows={2}
                         value={editNotes}
                         onChange={(e) => setEditNotes(e.target.value)}

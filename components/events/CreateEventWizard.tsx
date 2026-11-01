@@ -246,14 +246,15 @@ export default function CreateEventWizard() {
 
             {/* Event Type Grid */}
             <div>
-              <label className="block text-xs font-bold text-[#1E2922] uppercase tracking-wide mb-2">
+              <p id="event-type-label" className="block text-xs font-bold text-[#1E2922] uppercase tracking-wide mb-2">
                 Celebration Type *
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              </p>
+              <div role="group" aria-labelledby="event-type-label" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {EVENT_TYPES.map((item) => (
                   <button
                     key={item.type}
                     type="button"
+                    aria-pressed={formData.eventType === item.type}
                     onClick={() => setFormData({ ...formData, eventType: item.type })}
                     className={`p-3.5 rounded-xl text-left border transition-all ${
                       formData.eventType === item.type
@@ -438,6 +439,7 @@ export default function CreateEventWizard() {
                   <button
                     key={style}
                     type="button"
+                    aria-pressed={formData.styleTheme === style}
                     onClick={() => setFormData({ ...formData, styleTheme: style })}
                     className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                       formData.styleTheme === style
@@ -461,10 +463,10 @@ export default function CreateEventWizard() {
 
             {/* Venue Type */}
             <div>
-              <label className="block text-xs font-bold text-[#1E2922] uppercase tracking-wide mb-2">
+              <p id="venue-type-label" className="block text-xs font-bold text-[#1E2922] uppercase tracking-wide mb-2">
                 Venue Environment *
-              </label>
-              <div className="grid grid-cols-3 gap-3">
+              </p>
+              <div role="group" aria-labelledby="venue-type-label" className="grid grid-cols-3 gap-3">
                 {[
                   { id: 'indoor', label: 'Indoor Hall', desc: 'Banquet, ballroom, or gallery' },
                   { id: 'outdoor', label: 'Outdoor Lawn', desc: 'Garden, beach, or rooftop' },
@@ -473,6 +475,7 @@ export default function CreateEventWizard() {
                   <button
                     key={v.id}
                     type="button"
+                    aria-pressed={formData.venueType === v.id}
                     onClick={() => setFormData({ ...formData, venueType: v.id as VenueType })}
                     className={`p-3 rounded-xl text-left border transition-all ${
                       formData.venueType === v.id
@@ -523,16 +526,17 @@ export default function CreateEventWizard() {
 
             {/* Priorities */}
             <div>
-              <label className="block text-xs font-bold text-[#1E2922] uppercase tracking-wide mb-2">
+              <p id="priorities-label" className="block text-xs font-bold text-[#1E2922] uppercase tracking-wide mb-2">
                 Top Priorities (Pick 1 to 4) *
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              </p>
+              <div role="group" aria-labelledby="priorities-label" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {PRIORITY_OPTIONS.map((priority) => {
                   const selected = formData.priorities.includes(priority);
                   return (
                     <button
                       key={priority}
                       type="button"
+                      aria-pressed={selected}
                       onClick={() => togglePriority(priority)}
                       className={`p-3 rounded-xl text-left border flex items-center justify-between transition-all ${
                         selected

@@ -22,10 +22,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'npx next start -p 3005',
+  webServer: process.env.PLAYWRIGHT_EXTERNAL_SERVER === 'true' ? undefined : {
+    // Launch Node directly so Playwright can terminate the server process tree reliably on Windows.
+    command: `"${process.execPath}" node_modules/next/dist/bin/next start -p 3005`,
     url: 'http://localhost:3005',
-    reuseExistingServer: true,
+    // Reuse a locally running production server for Windows test runs, where
+    // Playwright's forced process-tree shutdown can otherwise leave the runner hanging.
+    // CI always starts a fresh server built by the pretest:e2e hook.
+    reuseExistingServer: !process.env.CI,
     timeout: 60000,
   },
 });

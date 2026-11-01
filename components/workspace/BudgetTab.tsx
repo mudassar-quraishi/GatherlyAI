@@ -274,7 +274,9 @@ export default function BudgetTab({ event, onUpdateEvent }: BudgetTabProps) {
             onSubmit={handleAddCategory}
             className="p-4 bg-[#F4EFEB] border-b border-[#E5DFD5] flex flex-wrap items-center gap-3"
           >
+            <label htmlFor="new-budget-category-name" className="sr-only">Budget category name</label>
             <input
+              id="new-budget-category-name"
               type="text"
               placeholder="Category Name (e.g. Vintage Car Rental)"
               value={newCatName}
@@ -282,7 +284,9 @@ export default function BudgetTab({ event, onUpdateEvent }: BudgetTabProps) {
               required
               className="flex-1 min-w-[200px] px-3.5 py-2 rounded-lg border border-[#E5DFD5] bg-[#FFFFFF] text-xs"
             />
+            <label htmlFor="new-budget-category-allocation" className="sr-only">Allocated budget amount</label>
             <input
+              id="new-budget-category-allocation"
               type="number"
               placeholder="Allocated Budget"
               value={newCatAllocated || ''}
@@ -334,6 +338,7 @@ export default function BudgetTab({ event, onUpdateEvent }: BudgetTabProps) {
                     <td className="py-3.5 px-4">
                       {isEditing ? (
                         <input
+                          aria-label={`Planned allocation for ${cat.name}`}
                           type="number"
                           value={editAllocated}
                           onChange={(e) => setEditAllocated(parseFloat(e.target.value) || 0)}
@@ -349,6 +354,7 @@ export default function BudgetTab({ event, onUpdateEvent }: BudgetTabProps) {
                     <td className="py-3.5 px-4">
                       {isEditing ? (
                         <input
+                          aria-label={`Actual spending for ${cat.name}`}
                           type="number"
                           value={editSpent}
                           onChange={(e) => setEditSpent(parseFloat(e.target.value) || 0)}

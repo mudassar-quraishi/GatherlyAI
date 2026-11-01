@@ -258,10 +258,11 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
             <h3 className="text-lg font-bold text-[#1E2922] mb-4">Add New Timeline Task</h3>
             <form onSubmit={handleAddTask} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                <label htmlFor="new-task-title" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                   Task Title *
                 </label>
                 <input
+                  id="new-task-title"
                   type="text"
                   required
                   placeholder="e.g. Schedule final tasting with caterer"
@@ -272,10 +273,11 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                <label htmlFor="new-task-description" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                   Description
                 </label>
                 <textarea
+                  id="new-task-description"
                   rows={2}
                   placeholder="Key instructions or contacts..."
                   value={newTask.description}
@@ -286,10 +288,11 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-task-due-date" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Due Date
                   </label>
                   <input
+                    id="new-task-due-date"
                     type="date"
                     value={newTask.dueDate}
                     onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
@@ -298,10 +301,11 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-task-stage" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Stage
                   </label>
                   <select
+                    id="new-task-stage"
                     value={newTask.stage}
                     onChange={(e) => setNewTask({ ...newTask, stage: e.target.value as TaskStage })}
                     className="w-full px-3 py-1.5 rounded-xl border border-[#E5DFD5] text-xs"
@@ -317,10 +321,11 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-task-priority" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Priority
                   </label>
                   <select
+                    id="new-task-priority"
                     value={newTask.priority}
                     onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as TaskPriority })}
                     className="w-full px-3 py-1.5 rounded-xl border border-[#E5DFD5] text-xs"
@@ -332,10 +337,11 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-task-owner" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Owner / Responsible
                   </label>
                   <input
+                    id="new-task-owner"
                     type="text"
                     placeholder="e.g. Lead Host, Sibling"
                     value={newTask.owner}
@@ -413,6 +419,7 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
                           {isEditing ? (
                             <div className="space-y-2">
                               <input
+                                aria-label={`Task title for ${task.title}`}
                                 type="text"
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
@@ -420,12 +427,14 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
                               />
                               <div className="flex flex-wrap gap-2 text-xs">
                                 <input
+                                  aria-label={`Due date for ${task.title}`}
                                   type="date"
                                   value={editDate}
                                   onChange={(e) => setEditDate(e.target.value)}
                                   className="px-2 py-1 rounded border border-[#E5DFD5] text-xs"
                                 />
                                 <select
+                                  aria-label={`Priority for ${task.title}`}
                                   value={editPriority}
                                   onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
                                   className="px-2 py-1 rounded border border-[#E5DFD5] text-xs"
@@ -435,6 +444,7 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
                                   <option value="low">Low</option>
                                 </select>
                                 <input
+                                  aria-label={`Owner for ${task.title}`}
                                   type="text"
                                   placeholder="Owner"
                                   value={editOwner}

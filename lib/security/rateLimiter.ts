@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { isIP } from 'node:net';
+
 /**
  * Server-only rate limiting abstraction for Gatherly AI.
  * 
@@ -29,6 +32,16 @@ export interface RateLimitResult {
 export interface RateLimitStore {
   check(key: string, maxRequests: number, windowSeconds: number, nowMs: number): Promise<RateLimitResult>;
   reset(key?: string): Promise<void> | void;
+}
+
+export function parseBoundedPositiveInteger(
+  rawValue: string | undefined,
+  fallback: number,
+  maximum: number
+): number {
+  if (!rawValue?.trim()) return fallback;
+  const parsed = Number(rawValue);
+  return Number.isSafeInteger(parsed) && parsed > 0 && parsed <= maximum ? parsed : fallback;
 }
 
 /**
@@ -269,13 +282,13 @@ export class UpstashRedisRateLimitStore implements RateLimitStore {
  */
 export const RATE_LIMIT_POLICIES: Record<string, RateLimitConfig> = {
   GENERATE_PLAN: {
-    maxRequests: parseInt(process.env.RATE_LIMIT_GENERATE_MAX || '5', 10),
-    windowSeconds: parseInt(process.env.RATE_LIMIT_GENERATE_WINDOW || '60', 10),
+    maxRequests: parseBoundedPositiveInteger(process.env.RATE_LIMIT_GENERATE_MAX, 5, 1000),
+    windowSeconds: parseBoundedPositiveInteger(process.env.RATE_LIMIT_GENERATE_WINDOW, 60, 86400),
     name: 'generate-plan',
   },
   REFINE_PLAN: {
-    maxRequests: parseInt(process.env.RATE_LIMIT_REFINE_MAX || '10', 10),
-    windowSeconds: parseInt(process.env.RATE_LIMIT_REFINE_WINDOW || '60', 10),
+    maxRequests: parseBoundedPositiveInteger(process.env.RATE_LIMIT_REFINE_MAX, 10, 1000),
+    windowSeconds: parseBoundedPositiveInteger(process.env.RATE_LIMIT_REFINE_WINDOW, 60, 86400),
     name: 'refine-plan',
   },
 };
@@ -351,7 +364,8 @@ export async function checkRateLimit(
 
   const activeStore = store ?? getActiveRateLimitStore();
   const nowMs = customNowMs ?? Date.now();
-  const namespacedKey = `${config.name || 'default'}:${clientKey}`;
+  const clientKeyHash = createHash('sha256').update(clientKey).digest('hex');
+  const namespacedKey = `${config.name || 'default'}:${clientKeyHash}`;
 
   try {
     return await activeStore.check(namespacedKey, config.maxRequests, config.windowSeconds, nowMs);
@@ -387,45 +401,18 @@ export function normalizeIp(raw: string | null | undefined): string | null {
   let cleaned = raw.trim();
   if (!cleaned) return null;
 
-  // Bracketed IPv6 with port: [2001:db8::1]:8080 -> 2001:db8::1
-  if (cleaned.startsWith('[') && cleaned.includes(']')) {
-    const endBracket = cleaned.indexOf(']');
-    cleaned = cleaned.substring(1, endBracket);
-  } else if (cleaned.includes('.') && cleaned.includes(':')) {
-    // IPv4 with port: 198.51.100.1:8080 -> 198.51.100.1
-    const colonParts = cleaned.split(':');
-    if (colonParts.length === 2 && /^\d+$/.test(colonParts[1])) {
-      cleaned = colonParts[0];
-    }
+  // Bracketed IPv6 (optionally with a port): [2001:db8::1]:8080 -> 2001:db8::1
+  if (cleaned.startsWith('[')) {
+    const bracketedAddress = /^\[([^\]]+)\](?::\d+)?$/.exec(cleaned);
+    if (!bracketedAddress) return null;
+    cleaned = bracketedAddress[1];
+  } else if (isIP(cleaned) === 0) {
+    // IPv4 with a port: 198.51.100.1:8080 -> 198.51.100.1
+    const ipv4WithPort = /^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/.exec(cleaned);
+    if (ipv4WithPort) cleaned = ipv4WithPort[1];
   }
 
-  // IPv4 validation: exactly 4 octets, each 0-255
-  const ipv4Parts = cleaned.split('.');
-  if (ipv4Parts.length === 4) {
-    const isValid = ipv4Parts.every((part) => {
-      if (!/^\d{1,3}$/.test(part)) return false;
-      const num = Number(part);
-      return num >= 0 && num <= 255;
-    });
-    if (isValid) return cleaned;
-  }
-
-  // IPv6 validation: 16-bit hex chunks separated by colons with optional single :: compression
-  if (cleaned.includes(':')) {
-    const doubleColonCount = (cleaned.match(/::/g) || []).length;
-    if (doubleColonCount <= 1) {
-      const parts = cleaned.split(':');
-      if (parts.length >= 3 && parts.length <= 9) {
-        const hexRegex = /^[0-9a-fA-F]{1,4}$/;
-        const validParts = parts.every((p) => p === '' || hexRegex.test(p));
-        if (validParts) {
-          return cleaned.toLowerCase();
-        }
-      }
-    }
-  }
-
-  return null;
+  return isIP(cleaned) === 0 ? null : cleaned.toLowerCase();
 }
 
 /**
@@ -451,7 +438,8 @@ export function getClientIdentifier(headers: Headers): string {
   if (forwardedFor) {
     const ips = forwardedFor.split(',').map((ip) => ip.trim()).filter(Boolean);
     if (ips.length > 0) {
-      const trustedHops = Math.max(1, parseInt(process.env.TRUSTED_PROXY_HOPS || '1', 10));
+      const configuredHops = Number.parseInt(process.env.TRUSTED_PROXY_HOPS || '1', 10);
+      const trustedHops = Number.isSafeInteger(configuredHops) && configuredHops > 0 ? configuredHops : 1;
       const targetIndex = Math.max(0, ips.length - trustedHops);
       const chosenIp = normalizeIp(ips[targetIndex]) || normalizeIp(ips[0]);
       if (chosenIp) {
@@ -471,9 +459,9 @@ export function getClientIdentifier(headers: Headers): string {
   const userAgent = headers.get('user-agent') || '';
   const acceptLanguage = headers.get('accept-language') || '';
   const secChUa = headers.get('sec-ch-ua') || '';
-  const traceId = headers.get('x-request-id') || headers.get('traceparent') || '';
 
-  const fingerprint = `${userAgent}|${acceptLanguage}|${secChUa}|${traceId}`;
+  // Request IDs are unique per request; including one would let each request bypass its quota.
+  const fingerprint = `${userAgent}|${acceptLanguage}|${secChUa}`;
   let hash = 0;
   for (let i = 0; i < fingerprint.length; i++) {
     hash = (hash << 5) - hash + fingerprint.charCodeAt(i);

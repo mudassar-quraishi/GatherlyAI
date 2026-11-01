@@ -153,10 +153,11 @@ export default function ScheduleTab({ event, onUpdateEvent }: ScheduleTabProps) 
             <form onSubmit={handleAddItem} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-activity-start-time" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Start Time *
                   </label>
                   <input
+                    id="new-activity-start-time"
                     type="text"
                     required
                     placeholder="e.g. 05:00 PM"
@@ -167,10 +168,11 @@ export default function ScheduleTab({ event, onUpdateEvent }: ScheduleTabProps) 
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-activity-end-time" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     End Time *
                   </label>
                   <input
+                    id="new-activity-end-time"
                     type="text"
                     required
                     placeholder="e.g. 06:00 PM"
@@ -182,10 +184,11 @@ export default function ScheduleTab({ event, onUpdateEvent }: ScheduleTabProps) 
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                <label htmlFor="new-activity-name" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                   Activity Name *
                 </label>
                 <input
+                  id="new-activity-name"
                   type="text"
                   required
                   placeholder="e.g. Cake Cutting & Champagne Toast"
@@ -196,10 +199,11 @@ export default function ScheduleTab({ event, onUpdateEvent }: ScheduleTabProps) 
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                <label htmlFor="new-activity-description" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                   Description
                 </label>
                 <textarea
+                  id="new-activity-description"
                   rows={2}
                   placeholder="Specific details, music cue, or staging..."
                   value={newItem.description}
@@ -210,10 +214,11 @@ export default function ScheduleTab({ event, onUpdateEvent }: ScheduleTabProps) 
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-activity-responsible-person" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Responsible Person
                   </label>
                   <input
+                    id="new-activity-responsible-person"
                     type="text"
                     placeholder="e.g. Emcee & DJ"
                     value={newItem.responsiblePerson}
@@ -223,10 +228,11 @@ export default function ScheduleTab({ event, onUpdateEvent }: ScheduleTabProps) 
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
+                  <label htmlFor="new-activity-notes" className="block text-xs font-bold text-[#1E2922] uppercase mb-1">
                     Notes
                   </label>
                   <input
+                    id="new-activity-notes"
                     type="text"
                     placeholder="e.g. Keep spotlight ready"
                     value={newItem.notes}
@@ -271,6 +277,7 @@ export default function ScheduleTab({ event, onUpdateEvent }: ScheduleTabProps) 
                   <div className="bg-[#FAF8F5] p-4 rounded-xl border border-[#1C3F30] space-y-3">
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <input
+                        aria-label={`Start time for ${item.activity}`}
                         type="text"
                         value={editItem.startTime || ''}
                         onChange={(e) => setEditItem({ ...editItem, startTime: e.target.value })}
@@ -278,6 +285,7 @@ export default function ScheduleTab({ event, onUpdateEvent }: ScheduleTabProps) 
                         placeholder="Start Time"
                       />
                       <input
+                        aria-label={`End time for ${item.activity}`}
                         type="text"
                         value={editItem.endTime || ''}
                         onChange={(e) => setEditItem({ ...editItem, endTime: e.target.value })}
@@ -286,6 +294,7 @@ export default function ScheduleTab({ event, onUpdateEvent }: ScheduleTabProps) 
                       />
                     </div>
                     <input
+                      aria-label={`Activity name for ${item.activity}`}
                       type="text"
                       value={editItem.activity || ''}
                       onChange={(e) => setEditItem({ ...editItem, activity: e.target.value })}
@@ -293,6 +302,7 @@ export default function ScheduleTab({ event, onUpdateEvent }: ScheduleTabProps) 
                       placeholder="Activity"
                     />
                     <textarea
+                      aria-label={`Description for ${item.activity}`}
                       rows={2}
                       value={editItem.description || ''}
                       onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}

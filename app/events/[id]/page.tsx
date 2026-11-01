@@ -45,18 +45,20 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
 
   // Persistent workspace-level readiness score tracking across all tab switches
   const readiness = event ? calculateReadinessScore(event) : null;
+  const readinessScore = readiness?.score ?? null;
+  const readinessRating = readiness?.rating ?? null;
   const [readinessAnnouncement, setReadinessAnnouncement] = useState<string>('');
   const prevScoreRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!readiness) return;
+    if (readinessScore === null || readinessRating === null) return;
     // Suppress announcement on initial page load; only announce meaningful runtime changes
-    if (prevScoreRef.current !== null && prevScoreRef.current !== readiness.score) {
-      const msg = `Event preparation readiness updated to ${readiness.score} percent, ${readiness.rating.replace('-', ' ')}.`;
+    if (prevScoreRef.current !== null && prevScoreRef.current !== readinessScore) {
+      const msg = `Event preparation readiness updated to ${readinessScore} percent, ${readinessRating.replace('-', ' ')}.`;
       setReadinessAnnouncement(msg);
     }
-    prevScoreRef.current = readiness.score;
-  }, [readiness?.score, readiness?.rating]);
+    prevScoreRef.current = readinessScore;
+  }, [readinessScore, readinessRating]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

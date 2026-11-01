@@ -143,6 +143,9 @@ export default function IdeasTab({ event, onUpdateEvent }: IdeasTabProps) {
         <p className="text-xs sm:text-sm text-[#64746D] mb-6">
           Request real-time plan modifications. The AI engine recalculates allocations, vendor recommendations, and activities while preserving your existing budget ceiling.
         </p>
+        <p className="text-xs text-[#64746D] mb-6">
+          With live Gemini enabled, event context, your current plan summary, budget categories, and refinement request are sent to Google. Avoid including sensitive personal details.
+        </p>
 
         {refinementSuccessNotice && (
           <div className="mb-6 p-4 rounded-xl bg-[#EDF7F0] border border-[#B7E4C7] text-[#2E7D47] text-xs sm:text-sm flex items-center space-x-2">
@@ -181,12 +184,15 @@ export default function IdeasTab({ event, onUpdateEvent }: IdeasTabProps) {
 
         {/* Custom refinement input */}
         <div className="pt-4 border-t border-[#F4EFEB]">
-          <label className="block text-xs font-bold text-[#1E2922] uppercase tracking-wide mb-2">
+          <label htmlFor="custom-refinement" className="block text-xs font-bold text-[#1E2922] uppercase tracking-wide mb-2">
             Custom Refinement Instruction
           </label>
           <div className="flex gap-2">
             <input
+              id="custom-refinement"
               type="text"
+              maxLength={600}
+              aria-describedby="custom-refinement-help"
               disabled={isRefining}
               placeholder="e.g. Focus on traditional Rajasthani folk music and reduce fireworks allocation..."
               value={customPrompt}
@@ -206,6 +212,9 @@ export default function IdeasTab({ event, onUpdateEvent }: IdeasTabProps) {
               <span>{isRefining ? 'Refining...' : 'Refine'}</span>
             </button>
           </div>
+          <p id="custom-refinement-help" className="mt-2 text-[11px] text-[#64746D]">
+            Up to 600 characters. Live Gemini receives this instruction when it refines your plan.
+          </p>
         </div>
       </div>
 

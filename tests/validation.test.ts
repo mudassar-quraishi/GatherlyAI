@@ -54,6 +54,24 @@ describe('Validation Schemas (Zod)', () => {
     }
   });
 
+  it('rejects impossible calendar dates while accepting leap days', () => {
+    const baseData = {
+      name: 'Community Celebration',
+      eventType: 'community',
+      date: '2028-02-29',
+      location: 'Town Hall',
+      guestCount: 100,
+      totalBudget: 50000,
+      styleTheme: 'Warm and welcoming',
+      priorities: ['Accessibility'],
+    };
+
+    expect(EventInputSchema.safeParse(baseData).success).toBe(true);
+    expect(EventInputSchema.safeParse({ ...baseData, date: '2027-02-29' }).success).toBe(false);
+    expect(EventInputSchema.safeParse({ ...baseData, date: '2028-13-01' }).success).toBe(false);
+    expect(EventInputSchema.safeParse({ ...baseData, date: '2028-04-31' }).success).toBe(false);
+  });
+
   it('validates a complete, real demo event plan for refinement', () => {
     const demo = createDefaultDemoEvent();
     const refinementPayload = {

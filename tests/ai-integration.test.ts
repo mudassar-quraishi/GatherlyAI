@@ -1,8 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { generateSamplePlan, createDefaultDemoEvent } from '@/lib/ai/sampleProvider';
-import { refineEventPlanWithAI } from '@/lib/ai/geminiService';
+import { generateEventPlanWithAI, refineEventPlanWithAI } from '@/lib/ai/geminiService';
+
+const { generateContentMock } = vi.hoisted(() => ({ generateContentMock: vi.fn() }));
+
+vi.mock('@google/genai', () => ({
+  GoogleGenAI: vi.fn().mockImplementation(() => ({
+    models: { generateContent: generateContentMock },
+  })),
+}));
 
 describe('AI & Sample Provider Integration', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    generateContentMock.mockReset();
+  });
+
   it('generates a complete, internally consistent sample plan for weddings', () => {
     const plan = generateSamplePlan({
       eventType: 'wedding',
@@ -45,5 +59,24 @@ describe('AI & Sample Provider Integration', () => {
     expect(result.plan).toBeDefined();
     expect(result.plan.generationSource).toBe('demo');
     expect(result.plan.lastRefinedAt).toBeDefined();
+  });
+
+  it('keeps provider failure details out of user-facing generation and refinement notices', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    generateContentMock.mockRejectedValue(new Error('internal-provider-detail secret=private'));
+
+    const event = createDefaultDemoEvent();
+    const generated = await generateEventPlanWithAI(event);
+    const refined = await refineEventPlanWithAI(event, event.plan!, 'budget-friendly');
+
+    expect(generated.source).toBe('demo');
+    expect(generated.notice).toContain('temporarily unavailable');
+    expect(generated.notice).not.toContain('internal-provider-detail');
+    expect(generated.notice).not.toContain('private');
+    expect(refined.source).toBe('demo');
+    expect(refined.notice).toContain('current plan was kept');
+    expect(refined.notice).not.toContain('internal-provider-detail');
+    expect(refined.notice).not.toContain('private');
   });
 });

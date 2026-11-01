@@ -7,6 +7,7 @@ import {
   normalizeIp,
   LUA_SLIDING_WINDOW_SCRIPT,
   RATE_LIMIT_POLICIES,
+  parseBoundedPositiveInteger,
   RateLimitStore,
 } from '@/lib/security/rateLimiter';
 
@@ -391,6 +392,8 @@ describe('Server-Side Rate Limiter', () => {
 
     it('rejects invalid or malformed IP addresses', () => {
       expect(normalizeIp('999.999.999.999')).toBeNull();
+      expect(normalizeIp('1:2:3')).toBeNull();
+      expect(normalizeIp('[2001:db8::1]extra')).toBeNull();
       expect(normalizeIp('not-an-ip')).toBeNull();
       expect(normalizeIp('')).toBeNull();
       expect(normalizeIp(null)).toBeNull();
@@ -443,6 +446,25 @@ describe('Server-Side Rate Limiter', () => {
 
         // Different user agents generate isolated anonymous quotas
         expect(id1).not.toBe(id2);
+
+        // Per-request trace IDs must not create a fresh quota identity on every request.
+        const hClient1NextRequest = new Headers({
+          'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)',
+          'accept-language': 'en-US,en;q=0.9',
+          'x-request-id': 'different-request-id',
+          traceparent: '00-different-trace-id-01',
+        });
+        expect(getClientIdentifier(hClient1NextRequest)).toBe(id1);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('uses a safe default when trusted proxy hop configuration is invalid', () => {
+      vi.stubEnv('TRUSTED_PROXY_HOPS', 'not-a-number');
+      try {
+        const headers = new Headers({ 'x-forwarded-for': 'spoofed.invalid, 192.0.2.10' });
+        expect(getClientIdentifier(headers)).toBe('192.0.2.10');
       } finally {
         vi.unstubAllEnvs();
       }
@@ -455,5 +477,41 @@ describe('Server-Side Rate Limiter', () => {
 
     expect(RATE_LIMIT_POLICIES.REFINE_PLAN.maxRequests).toBe(10);
     expect(RATE_LIMIT_POLICIES.REFINE_PLAN.windowSeconds).toBe(60);
+  });
+
+  it('uses safe defaults for malformed or out-of-range rate limit settings', () => {
+    expect(parseBoundedPositiveInteger(undefined, 5, 1000)).toBe(5);
+    expect(parseBoundedPositiveInteger('invalid', 5, 1000)).toBe(5);
+    expect(parseBoundedPositiveInteger('0', 5, 1000)).toBe(5);
+    expect(parseBoundedPositiveInteger('1001', 5, 1000)).toBe(5);
+    expect(parseBoundedPositiveInteger('25', 5, 1000)).toBe(25);
+  });
+
+  it('hashes client identifiers before sending them to the rate-limit store', async () => {
+    const capturedKeys: string[] = [];
+    const captureStore: RateLimitStore = {
+      check: async (key, maxRequests, windowSeconds) => {
+        capturedKeys.push(key);
+        return {
+          success: true,
+          limit: maxRequests,
+          remaining: maxRequests - 1,
+          resetSeconds: windowSeconds,
+          retryAfterSeconds: 0,
+        };
+      },
+      reset: () => {},
+    };
+
+    await checkRateLimit(
+      '198.51.100.23',
+      { name: 'privacy-test', maxRequests: 5, windowSeconds: 60 },
+      captureStore,
+      1000
+    );
+
+    expect(capturedKeys).toHaveLength(1);
+    expect(capturedKeys[0]).toMatch(/^privacy-test:[a-f0-9]{64}$/);
+    expect(capturedKeys[0]).not.toContain('198.51.100.23');
   });
 });
