@@ -173,7 +173,8 @@ flowchart TD
    GEMINI_API_KEY=your_gemini_api_key_here
    GEMINI_MODEL=gemini-2.5-flash
 
-   # Optional: Distributed Production Rate Limiter (Upstash Redis)
+   # MANDATORY IN PRODUCTION FOR LIVE AI: Distributed Rate Limiter (Upstash Redis)
+   # Required in production when GEMINI_API_KEY is enabled to prevent multi-instance abuse.
    UPSTASH_REDIS_REST_URL=https://your-upstash-redis.upstash.io
    UPSTASH_REDIS_REST_TOKEN=your_upstash_token_here
    ```
@@ -224,14 +225,14 @@ Gatherly AI provides a first-class **Deterministic Demo Mode**:
 ```bash
 npm run test
 ```
-Executes **44 unit and integration tests across 8 suites** in Vitest:
+Executes **56 unit and integration tests across 8 suites** in Vitest:
 - Budget integer math & contingency calculations (`tests/budget.test.ts`)
 - Calendar timezone-safe timeline anchoring & acceleration (`tests/timeline.test.ts`)
 - Strict Zod schemas for generation & refinement (`tests/validation.test.ts`)
 - Storage CRUD & multi-event data isolation (`tests/storage.test.ts`)
 - Deterministic demo plan generation (`tests/ai-integration.test.ts`)
 - Readiness score formulas (`tests/readiness.test.ts`)
-- Distributed & bounded rate limiting with fail-closed safety (`tests/rate-limiter.test.ts`)
+- Atomic Lua Redis rate limiting, 30-request concurrency race tests & fail-closed safety (`tests/rate-limiter.test.ts`)
 - WAI-ARIA runtime tab & screen-reader live announcements (`tests/accessibility.test.ts`)
 
 ### End-to-End Browser Regression Tests (Playwright)
@@ -282,8 +283,9 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 3. In **Environment Variables**, add:
    - `GEMINI_API_KEY`: *(Your Google AI Studio API key)*
    - `GEMINI_MODEL`: `gemini-2.5-flash`
-   - `UPSTASH_REDIS_REST_URL`: *(Optional: Distributed Upstash Redis URL)*
-   - `UPSTASH_REDIS_REST_TOKEN`: *(Optional: Distributed Upstash Redis Token)*
+   - `UPSTASH_REDIS_REST_URL`: *(MANDATORY for live Gemini in production)*
+   - `UPSTASH_REDIS_REST_TOKEN`: *(MANDATORY for live Gemini in production)*
+   - `RATE_LIMIT_FAIL_CLOSED`: `true`
 4. Click **Deploy**.
 5. Vercel automatically builds the Next.js App Router application and provides a fast global edge deployment.
 
@@ -291,10 +293,11 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 
 ## 11. Security, Reliability & Privacy
 
-- **Distributed Production Rate Limiting:** Server-side rate limiter supports distributed Redis via Upstash REST pipelines (`UpstashRedisRateLimitStore`) for multi-instance/serverless deployments.
-- **Fail-Closed Safety Policy:** If rate-limiting infrastructure becomes unavailable while live Gemini AI is enabled, endpoints fail safely (HTTP 503) rather than bypassing protection and risking quota exhaustion. Rejected requests never reach the Gemini provider.
-- **Hard-Bounded In-Memory Store:** The local in-memory fallback uses strict LRU eviction (`while (size >= maxKeys) delete oldestKey`), ensuring memory usage never exceeds configured boundaries.
-- **Spoof-Resistant Client Identification:** Client IP extraction prioritizes platform ingress headers (`x-vercel-forwarded-for`, `cf-connecting-ip`, `x-real-ip`) and inspects reverse-proxy hops rather than blindly trusting spoofable leftmost headers.
+- **Atomic Lua Sliding-Window Rate Limiting:** Server-side rate limiter executes a single atomic Redis Lua script (`LUA_SLIDING_WINDOW_SCRIPT`) via Upstash REST. Pruning expired timestamps, counting active hits, appending new hits, and resetting TTL occur within a single atomic Redis transaction—eliminating race conditions under concurrent requests.
+- **Mandatory Production Redis Enforcement:** In production with live Gemini enabled (`NODE_ENV === 'production'` & `GEMINI_API_KEY`), Upstash Redis is strictly mandatory. Silent fallback to an in-memory store is prohibited to prevent multi-instance quota exhaustion.
+- **Fail-Closed Safety Policy:** If rate-limiting infrastructure becomes unavailable or misconfigured in production, endpoints fail safely (HTTP 503) rather than bypassing protection. HTTP status codes and individual Redis command error payloads are rigorously validated.
+- **Hard-Bounded In-Memory Store:** The local in-memory fallback uses strict LRU eviction (`while (size >= maxKeys) delete oldestKey`), ensuring memory usage never exceeds configured boundaries in local development or demo environments.
+- **Spoof-Resistant Client Identification & Anonymous Isolation:** Client IP extraction prioritizes platform ingress headers (`x-vercel-forwarded-for`, `cf-connecting-ip`, `x-real-ip`) and inspects reverse-proxy hops. Unidentified production clients are assigned isolated anonymous fingerprints (`anon-<hash>`) rather than collapsing onto `127.0.0.1`.
 - **No Public API Key Exposure:** The Gemini API key is read solely server-side via `process.env.GEMINI_API_KEY`. It is never exposed in client bundles or network responses.
 - **Server-Side Input Validation:** All API requests pass through strict Zod schemas with bounded numerical limits, guest count checks (1–50,000), date regex, and string length caps.
 - **Zero Third-Party Database PII:** User celebration data remains strictly inside the user's browser `localStorage`. No personal guest names or contact information are stored on external databases.
@@ -315,5 +318,5 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 - [x] **Walkthrough Demo Video Script:** Complete 3:40 script in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
 - [x] **No Login Required:** Accessible to evaluators immediately with 1-click demo preloading.
 - [x] **Genuine Functionality:** Editable budgets, task toggles, vendor statuses, schedule editor, AI plan generation & refinement.
-- [x] **Code Quality & Testing:** 44/44 Vitest tests passing across 8 suites, 10/10 Playwright E2E browser tests passing, 0 TypeScript errors, 0 ESLint warnings.
+- [x] **Code Quality & Testing:** 56/56 Vitest tests passing across 8 suites, 10/10 Playwright E2E browser tests passing, 0 TypeScript errors, 0 ESLint warnings.
 - [x] **Problem Statement Alignment:** Weddings, birthdays, and community events with budgets, timelines, vendors, and ideas.

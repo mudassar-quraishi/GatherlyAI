@@ -2,11 +2,12 @@
  * Server-only rate limiting abstraction for Gatherly AI.
  * 
  * Provides:
- * 1. Proxy-aware, spoof-resistant client identification
- * 2. Sliding-window log rate limiter with hard-bounded in-memory LRU storage
- * 3. Native distributed Upstash Redis REST store support for multi-instance production
- * 4. Documented fail-closed safety policy for live AI quota protection
- * 5. Deterministic clock and store injection for testing
+ * 1. Single atomic Lua script for Redis sliding-window rate limiting (zero race conditions)
+ * 2. Strict validation of Redis HTTP responses and command execution
+ * 3. Mandatory Upstash Redis configuration in production whenever live Gemini AI is enabled
+ * 4. Hard-bounded in-memory LRU fallback storage for local/demo use
+ * 5. Robust IPv4/IPv6 normalization with port stripping and anonymous client isolation
+ * 6. Deterministic clock and store injection for testing
  */
 
 export interface RateLimitConfig {
@@ -29,6 +30,51 @@ export interface RateLimitStore {
   check(key: string, maxRequests: number, windowSeconds: number, nowMs: number): Promise<RateLimitResult>;
   reset(key?: string): Promise<void> | void;
 }
+
+/**
+ * Atomic Lua script for genuine sliding-window rate limiting in Redis.
+ * Eliminates check-then-write race conditions by executing prune, count,
+ * conditional write, and expiration in a single atomic transaction.
+ *
+ * KEYS[1]: Redis sorted set key
+ * ARGV[1]: Current timestamp in ms (now)
+ * ARGV[2]: Window size in ms
+ * ARGV[3]: Maximum allowed requests
+ * ARGV[4]: Unique member ID for this hit
+ *
+ * Returns: { isAllowed (1 or 0), remainingCount, retryAfterSeconds }
+ */
+export const LUA_SLIDING_WINDOW_SCRIPT = `
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+local member = ARGV[4]
+local clearBefore = now - window
+
+-- 1. Remove expired timestamps outside sliding window
+redis.call('ZREMRANGEBYSCORE', key, 0, clearBefore)
+
+-- 2. Count active hits within current window
+local currentHits = redis.call('ZCARD', key)
+
+if currentHits < limit then
+  -- 3. Under limit: atomically add current hit and refresh expiration TTL
+  redis.call('ZADD', key, now, member)
+  redis.call('PEXPIRE', key, window * 2)
+  return { 1, limit - currentHits - 1, 0 }
+else
+  -- 4. Limit reached: query oldest timestamp in current window to calculate retryAfter
+  local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+  local retryAfter = 1
+  if oldest and #oldest >= 2 then
+    local oldestTs = tonumber(oldest[2])
+    local resetAt = oldestTs + window
+    retryAfter = math.max(1, math.ceil((resetAt - now) / 1000))
+  end
+  return { 0, 0, retryAfter }
+end
+`.trim();
 
 /**
  * In-memory sliding-window log rate limiter with strict, hard-bounded LRU eviction
@@ -129,8 +175,8 @@ export class MemoryRateLimitStore implements RateLimitStore {
 
 /**
  * Distributed rate limiter adapter backed by Upstash Redis REST API.
- * Uses atomic Redis pipeline commands (ZREMRANGEBYSCORE, ZCARD, ZADD, EXPIRE)
- * to provide global rate limiting across serverless and multi-instance deployments.
+ * Uses atomic Lua script execution to guarantee zero race conditions across
+ * concurrent requests in serverless or multi-instance deployments.
  */
 export class UpstashRedisRateLimitStore implements RateLimitStore {
   private url: string;
@@ -150,77 +196,56 @@ export class UpstashRedisRateLimitStore implements RateLimitStore {
     nowMs: number
   ): Promise<RateLimitResult> {
     const windowMs = windowSeconds * 1000;
-    const windowStart = nowMs - windowMs;
     const redisKey = `gatherly:ratelimit:${key}`;
     const memberId = `${nowMs}:${Math.random().toString(36).slice(2, 8)}`;
 
-    // Atomic pipeline:
-    // 1. ZREMRANGEBYSCORE: purge requests older than sliding window
-    // 2. ZCARD: query count of active requests in current window
-    // 3. ZRANGE ... WITHSCORES: retrieve oldest active request timestamp
-    const pipelineCmds = [
-      ['ZREMRANGEBYSCORE', redisKey, 0, windowStart],
-      ['ZCARD', redisKey],
-      ['ZRANGE', redisKey, 0, 0, 'WITHSCORES'],
-    ];
-
-    const res = await this.fetchFn(`${this.url}/pipeline`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(pipelineCmds),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Upstash RateLimit HTTP Error ${res.status}: ${res.statusText}`);
-    }
-
-    const results = (await res.json()) as Array<{ result?: unknown; error?: string }>;
-    const count = typeof results[1]?.result === 'number' ? results[1].result : 0;
-    const oldestEntry = results[2]?.result;
-
-    if (count >= maxRequests) {
-      let oldestTimestamp = windowStart;
-      if (Array.isArray(oldestEntry) && oldestEntry.length > 0) {
-        const scoreVal = Number(oldestEntry[1] ?? oldestEntry[0]);
-        if (!isNaN(scoreVal) && scoreVal > 0) {
-          oldestTimestamp = scoreVal;
-        }
-      }
-      const resetMs = Math.max(0, oldestTimestamp + windowMs - nowMs);
-      const retryAfterSeconds = Math.max(1, Math.ceil(resetMs / 1000));
-
-      return {
-        success: false,
-        limit: maxRequests,
-        remaining: 0,
-        resetSeconds: retryAfterSeconds,
-        retryAfterSeconds,
-        limiterBackend: 'upstash-redis',
-      };
-    }
-
-    // Under limit: record request timestamp and refresh TTL
-    await this.fetchFn(`${this.url}/pipeline`, {
+    const res = await this.fetchFn(this.url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify([
-        ['ZADD', redisKey, nowMs, memberId],
-        ['EXPIRE', redisKey, windowSeconds * 2],
+        'EVAL',
+        LUA_SLIDING_WINDOW_SCRIPT,
+        1,
+        redisKey,
+        String(nowMs),
+        String(windowMs),
+        String(maxRequests),
+        memberId,
       ]),
     });
 
+    if (!res.ok) {
+      throw new Error(`Upstash RateLimit HTTP Error ${res.status}: ${res.statusText}`);
+    }
+
+    const json = (await res.json()) as
+      | { result?: unknown; error?: string }
+      | Array<{ result?: unknown; error?: string }>;
+
+    const data = Array.isArray(json) ? json[0] : json;
+
+    if (data?.error) {
+      throw new Error(`Upstash Redis Command Error: ${data.error}`);
+    }
+
+    if (!data || !Array.isArray(data.result) || data.result.length < 3) {
+      throw new Error(`Upstash Redis Invalid Script Output: ${JSON.stringify(data)}`);
+    }
+
+    const [allowedFlag, remainingCount, retryAfterSecs] = data.result as [number, number, number];
+    const isAllowed = Number(allowedFlag) === 1;
+    const remaining = Math.max(0, Number(remainingCount));
+    const retryAfterSeconds = Math.max(0, Number(retryAfterSecs));
+
     return {
-      success: true,
+      success: isAllowed,
       limit: maxRequests,
-      remaining: Math.max(0, maxRequests - count - 1),
-      resetSeconds: windowSeconds,
-      retryAfterSeconds: 0,
+      remaining: isAllowed ? remaining : 0,
+      resetSeconds: isAllowed ? windowSeconds : retryAfterSeconds,
+      retryAfterSeconds: isAllowed ? 0 : retryAfterSeconds,
       limiterBackend: 'upstash-redis',
     };
   }
@@ -228,10 +253,13 @@ export class UpstashRedisRateLimitStore implements RateLimitStore {
   async reset(key?: string): Promise<void> {
     if (key) {
       const redisKey = `gatherly:ratelimit:${key}`;
-      await this.fetchFn(`${this.url}/DEL/${encodeURIComponent(redisKey)}`, {
+      const res = await this.fetchFn(`${this.url}/DEL/${encodeURIComponent(redisKey)}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${this.token}` },
       });
+      if (!res.ok) {
+        throw new Error(`Upstash DEL Error ${res.status}: ${res.statusText}`);
+      }
     }
   }
 }
@@ -264,6 +292,20 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
 }
 
 /**
+ * Checks whether live Gemini AI is enabled in production.
+ */
+export function isLiveAIInProduction(): boolean {
+  return process.env.NODE_ENV === 'production' && Boolean(process.env.GEMINI_API_KEY);
+}
+
+/**
+ * Checks whether distributed Upstash Redis credentials are configured.
+ */
+export function isUpstashConfigured(): boolean {
+  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+}
+
+/**
  * Gets the active rate limit store based on configuration.
  */
 export function getActiveRateLimitStore(): RateLimitStore {
@@ -275,8 +317,10 @@ export function getActiveRateLimitStore(): RateLimitStore {
  * Supports clock and store injection for deterministic automated tests.
  * 
  * Safety Policy:
- * If a distributed rate limiter is configured but encounters network/backend failures,
- * production requests with live AI configured will fail-closed to prevent quota exhaustion.
+ * 1. In production with live Gemini AI, distributed Upstash Redis is MANDATORY.
+ *    Silently falling back to an in-memory store is prohibited.
+ * 2. If storage backend encounters an unexpected failure, requests fail closed (HTTP 503)
+ *    to prevent Gemini quota exhaustion.
  */
 export async function checkRateLimit(
   clientKey: string,
@@ -284,6 +328,27 @@ export async function checkRateLimit(
   store?: RateLimitStore,
   customNowMs?: number
 ): Promise<RateLimitResult> {
+  const isProdWithLiveAI = isLiveAIInProduction();
+  const hasUpstash = isUpstashConfigured();
+
+  // Enforce mandatory distributed store when live AI is enabled in production
+  if (isProdWithLiveAI && !hasUpstash && !store) {
+    console.error(
+      '[Gatherly RateLimiter] Production Security Misconfiguration: Live Gemini AI is enabled in production, ' +
+      'but UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are not configured. ' +
+      'In-memory rate limiting is strictly prohibited in production with live AI.'
+    );
+    return {
+      success: false,
+      limit: config.maxRequests,
+      remaining: 0,
+      resetSeconds: 60,
+      retryAfterSeconds: 60,
+      limiterBackend: 'upstash-redis',
+      limiterFailure: true,
+    };
+  }
+
   const activeStore = store ?? getActiveRateLimitStore();
   const nowMs = customNowMs ?? Date.now();
   const namespacedKey = `${config.name || 'default'}:${clientKey}`;
@@ -293,10 +358,8 @@ export async function checkRateLimit(
   } catch (error) {
     console.error('[Gatherly RateLimiter] Storage backend failure:', error);
 
-    const isProductionWithLiveAI =
-      process.env.NODE_ENV === 'production' && !!process.env.GEMINI_API_KEY;
     const shouldFailClosed =
-      process.env.RATE_LIMIT_FAIL_CLOSED === 'true' || isProductionWithLiveAI;
+      process.env.RATE_LIMIT_FAIL_CLOSED === 'true' || isProdWithLiveAI;
 
     if (shouldFailClosed) {
       return {
@@ -305,60 +368,118 @@ export async function checkRateLimit(
         remaining: 0,
         resetSeconds: 60,
         retryAfterSeconds: 60,
+        limiterBackend: activeStore instanceof UpstashRedisRateLimitStore ? 'upstash-redis' : 'memory',
         limiterFailure: true,
       };
     }
 
-    // Fall back safely to in-memory store for demo/development environments
+    // Fall back to in-memory store ONLY in non-production or demo environments
     return defaultMemoryStore.check(namespacedKey, config.maxRequests, config.windowSeconds, nowMs);
   }
+}
+
+/**
+ * Normalizes and validates an IPv4 or IPv6 address.
+ * Strips port numbers if present (e.g. 192.0.2.1:8080 or [2001:db8::1]:443).
+ */
+export function normalizeIp(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let cleaned = raw.trim();
+  if (!cleaned) return null;
+
+  // Bracketed IPv6 with port: [2001:db8::1]:8080 -> 2001:db8::1
+  if (cleaned.startsWith('[') && cleaned.includes(']')) {
+    const endBracket = cleaned.indexOf(']');
+    cleaned = cleaned.substring(1, endBracket);
+  } else if (cleaned.includes('.') && cleaned.includes(':')) {
+    // IPv4 with port: 198.51.100.1:8080 -> 198.51.100.1
+    const colonParts = cleaned.split(':');
+    if (colonParts.length === 2 && /^\d+$/.test(colonParts[1])) {
+      cleaned = colonParts[0];
+    }
+  }
+
+  // IPv4 validation: exactly 4 octets, each 0-255
+  const ipv4Parts = cleaned.split('.');
+  if (ipv4Parts.length === 4) {
+    const isValid = ipv4Parts.every((part) => {
+      if (!/^\d{1,3}$/.test(part)) return false;
+      const num = Number(part);
+      return num >= 0 && num <= 255;
+    });
+    if (isValid) return cleaned;
+  }
+
+  // IPv6 validation: 16-bit hex chunks separated by colons with optional single :: compression
+  if (cleaned.includes(':')) {
+    const doubleColonCount = (cleaned.match(/::/g) || []).length;
+    if (doubleColonCount <= 1) {
+      const parts = cleaned.split(':');
+      if (parts.length >= 3 && parts.length <= 9) {
+        const hexRegex = /^[0-9a-fA-F]{1,4}$/;
+        const validParts = parts.every((p) => p === '' || hexRegex.test(p));
+        if (validParts) {
+          return cleaned.toLowerCase();
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
  * Safely extracts client identifier from request headers.
  * Uses trusted ingress headers (Vercel, Cloudflare, X-Real-IP) and
  * resolves proxy hops to prevent spoofing from client-provided leftmost headers.
+ * 
+ * Never assigns unidentified production clients to 127.0.0.1.
  */
 export function getClientIdentifier(headers: Headers): string {
-  const IP_REGEX = /^(?:(?:\d{1,3}\.){3}\d{1,3}|(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4})$/;
-
   // 1. Platform-trusted headers that cannot be spoofed by external callers
-  const vercelIp = headers.get('x-vercel-forwarded-for');
-  if (vercelIp) {
-    const candidate = vercelIp.split(',')[0].trim();
-    if (IP_REGEX.test(candidate)) return candidate;
-  }
+  const vercelIp = normalizeIp(headers.get('x-vercel-forwarded-for')?.split(',')[0]);
+  if (vercelIp) return vercelIp;
 
-  const cfIp = headers.get('cf-connecting-ip');
-  if (cfIp) {
-    const candidate = cfIp.trim();
-    if (IP_REGEX.test(candidate)) return candidate;
-  }
+  const cfIp = normalizeIp(headers.get('cf-connecting-ip'));
+  if (cfIp) return cfIp;
 
-  const realIp = headers.get('x-real-ip');
-  if (realIp) {
-    const candidate = realIp.trim();
-    if (IP_REGEX.test(candidate)) return candidate;
-  }
+  const realIp = normalizeIp(headers.get('x-real-ip'));
+  if (realIp) return realIp;
 
   // 2. Standard X-Forwarded-For parsing with trusted proxy hop handling
   const forwardedFor = headers.get('x-forwarded-for');
   if (forwardedFor) {
     const ips = forwardedFor.split(',').map((ip) => ip.trim()).filter(Boolean);
     if (ips.length > 0) {
-      // In a reverse-proxy topology (Vercel/ALB/Nginx), the nearest proxy appends the client IP
-      // at the right. The leftmost IP is attacker-controlled unless trusted hops are strictly 0.
       const trustedHops = Math.max(1, parseInt(process.env.TRUSTED_PROXY_HOPS || '1', 10));
       const targetIndex = Math.max(0, ips.length - trustedHops);
-      const chosenIp = ips[targetIndex] || ips[0];
-      if (IP_REGEX.test(chosenIp)) {
+      const chosenIp = normalizeIp(ips[targetIndex]) || normalizeIp(ips[0]);
+      if (chosenIp) {
         return chosenIp;
       }
     }
   }
 
-  // 3. Fallback for local testing and isolated environments
-  return '127.0.0.1';
+  // 3. Fallback:
+  // For local development and test environments, use loopback
+  if (process.env.NODE_ENV !== 'production') {
+    return '127.0.0.1';
+  }
+
+  // In production, do NOT assign all unidentified clients to 127.0.0.1 (which would collapse
+  // separate users into one shared quota). Generate an isolated pseudo-identifier.
+  const userAgent = headers.get('user-agent') || '';
+  const acceptLanguage = headers.get('accept-language') || '';
+  const secChUa = headers.get('sec-ch-ua') || '';
+  const traceId = headers.get('x-request-id') || headers.get('traceparent') || '';
+
+  const fingerprint = `${userAgent}|${acceptLanguage}|${secChUa}|${traceId}`;
+  let hash = 0;
+  for (let i = 0; i < fingerprint.length; i++) {
+    hash = (hash << 5) - hash + fingerprint.charCodeAt(i);
+    hash |= 0;
+  }
+  return `anon-${Math.abs(hash).toString(36)}`;
 }
 
 /**

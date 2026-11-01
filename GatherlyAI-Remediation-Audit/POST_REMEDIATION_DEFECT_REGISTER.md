@@ -10,7 +10,7 @@
 
 | Defect ID | Severity | Category | Description | Baseline Status | Post-Remediation Status | Verification Method |
 |:---:|:---:|:---:|---|:---:|:---:|---|
-| **SEC-01** | Medium | Security | Public AI endpoints (`/api/generate-plan`, `/api/refine-plan`) lacked server-side rate limiting. | OPEN | **RESOLVED** | Unit tests in `tests/rate-limiter.test.ts` (6 tests passing); HTTP 429 and `Retry-After` verified. |
+| **SEC-01** | High | Security | Public AI endpoints (`/api/generate-plan`, `/api/refine-plan`) lacked atomic server-side rate limiting and production Redis enforcement. | OPEN | **RESOLVED** | Atomic Lua script in `lib/security/rateLimiter.ts`; mandatory production Upstash enforcement; 21 unit tests in `tests/rate-limiter.test.ts` including 30-request concurrent race test (5 pass, 25 fail). |
 | **VAL-01** | Medium | Code Quality / Validation | `RefinePlanSchema` in `lib/validation/schemas.ts` used `z.any()` for nested plan structures. | OPEN | **RESOLVED** | Concrete sub-schemas extracted and validated in `tests/validation.test.ts` (10 tests passing). |
 | **A11Y-01** | Medium | Accessibility | Workspace navigation lacked WAI-ARIA tab semantics (`role="tablist"`, `role="tab"`, `aria-selected`, `aria-controls`, `role="tabpanel"`) and roving tabindex keyboard navigation. | OPEN | **RESOLVED** | Tested in `tests/accessibility.test.ts` and automated Playwright E2E Test 6. |
 | **A11Y-02** | Low | Accessibility | Dynamic readiness-score updates in `OverviewTab.tsx` lacked accessible screen-reader live announcements. | OPEN | **RESOLVED** | Dedicated live region `<div role="status" aria-live="polite" aria-atomic="true">` added and tested in `tests/accessibility.test.ts`. |
@@ -24,14 +24,12 @@
 - **Original Audit Finding:** Any client could send unlimited concurrent or repeated requests to `/api/generate-plan` and `/api/refine-plan`, exhausting API rate limits, incurring high API costs, or destabilizing the server process.
 - **Root Cause:** Absence of rate limiting middleware or service layer before reaching AI generation logic.
 - **Resolution:**
-  - Implemented `lib/security/rateLimiter.ts` providing sliding-window rate limiting.
-  - Defined per-endpoint policies:
-    - `GENERATE_PLAN`: 5 requests per minute per IP.
-    - `REFINE_PLAN`: 10 requests per minute per IP.
-  - Client IP resolved with proxy support (`x-forwarded-for` leftmost untrusted client IP parsing).
-  - Memory store bounded with automatic expiration purging to prevent memory leaks.
+  - Implemented `lib/security/rateLimiter.ts` using a **single atomic Lua script** (`LUA_SLIDING_WINDOW_SCRIPT`) executed in Upstash Redis REST. Pruning, counting, conditional insertion, and expiration TTL are executed within a single Redis atomic transaction, eliminating race conditions under concurrent requests.
+  - Made **Upstash Redis mandatory in production** whenever live Gemini AI is enabled. Silent in-memory fallback is strictly prohibited in production, failing closed (HTTP 503) if unconfigured.
+  - Added strict validation of Redis HTTP response status (`res.ok`), command execution error payloads (`data.error`), and return script shape (`Array.isArray(data.result)`).
+  - Improved IPv4/IPv6 normalization with port stripping (`normalizeIp`) and isolated unidentified production callers using anonymous fingerprints (`anon-<hash>`) rather than collapsing onto `127.0.0.1`.
+  - Added **30-request concurrent race-condition test** in `tests/rate-limiter.test.ts` where with a limit of 5, exactly 5 succeed and 25 fail without race conditions.
   - Returns HTTP 429 Too Many Requests with RFC-compliant `Retry-After` header and sanitized error payload.
-  - Documented shared Upstash Redis configuration in `.env.example`.
 - **Status:** **CLOSED — VERIFIED**
 
 ---

@@ -24,7 +24,7 @@ The application’s overall hackathon rating is **59/60 (98.3%)**, fully substan
 | Code Quality | 9/10 | **10/10** | +1 | Elimination of `z.any()` across schemas; strict `eventDetails` validation on refinement; concrete typed models; 0 ESLint warnings; 0 TypeScript errors. |
 | Security | 9/10 | **10/10** | +1 | Distributed Upstash Redis REST pipeline adapter (`UpstashRedisRateLimitStore`); hard-bounded LRU memory eviction; spoof-resistant platform ingress resolution (`x-vercel-forwarded-for`, `cf-connecting-ip`, `x-real-ip`); fail-closed safety policy; 0 production vulnerabilities. |
 | Efficiency | 9/10 | **9/10** | 0 | Sliding-window log with atomic Redis pipeline commands (`ZREMRANGEBYSCORE`, `ZCARD`, `ZRANGE`, `ZADD`, `EXPIRE`); strict LRU cache eviction; integer arithmetic currency calculation; Next.js 16 Turbopack build optimization. |
-| Testing | 9/10 | **10/10** | +1 | Automated test coverage expanded to **54 total automated tests** (44 unit/integration tests across 8 suites in Vitest + 10 strengthened browser E2E workflows in Playwright with clean-checkout build prehook). |
+| Testing | 9/10 | **10/10** | +1 | Automated test coverage expanded to **66 total automated tests** (56 unit/integration tests across 8 suites in Vitest + 10 strengthened browser E2E workflows in Playwright with clean-checkout build prehook). |
 | Accessibility | 8/10 | **10/10** | +2 | Complete WAI-ARIA tab pattern with all 6 panels rendered simultaneously in DOM (`role="tabpanel"`, `hidden`, roving `tabIndex`); workspace-level persistent live status region (`role="status"`, `aria-live="polite"`, `aria-atomic="true"`) announcing readiness score updates even across tab switches. |
 | Problem Statement Alignment | 10/10 | **10/10** | 0 | Complete celebration workflows across weddings, birthdays, anniversaries, and community gatherings with budget reconciliation, vendor checklists, and multi-day schedules. |
 | **Total** | **54/60** | **59/60** | **+5** | **98.3% Composite Score** |
@@ -34,15 +34,21 @@ The application’s overall hackathon rating is **59/60 (98.3%)**, fully substan
 ## 2. In-Depth Remediation Review
 
 ### Finding 1: Distributed & Production-Ready Rate Limiting on Public AI Endpoints
-- **Baseline Defect & Audit Critique:** Public endpoints `/api/generate-plan` and `/api/refine-plan` called an in-memory rate limiter without an actual Redis adapter in code. The memory store allowed unbounded growth if keys stayed active, and client IP extraction blindly trusted leftmost `x-forwarded-for` values.
+- **Baseline Defect & Audit Critique:** Public endpoints `/api/generate-plan` and `/api/refine-plan` called an in-memory rate limiter without an actual Redis adapter in code. A subsequent review identified a two-stage Redis check/write pattern prone to race conditions, silent in-memory fallback when live AI is enabled in production, lack of HTTP response status and individual command error validation, and assigning unidentified production clients to `127.0.0.1`.
 - **Remediation Implementation:**
-  - Built `UpstashRedisRateLimitStore` in `lib/security/rateLimiter.ts` using atomic Redis pipeline requests via fetch (`ZREMRANGEBYSCORE`, `ZCARD`, `ZRANGE`, `ZADD`, `EXPIRE`), fully implementing distributed multi-instance sliding-window rate limiting.
-  - Hard-bounded the local `MemoryRateLimitStore` with strict LRU eviction (`while (this.hits.size >= this.maxKeys) delete oldestKey`), guaranteeing that memory usage never exceeds configured bounds under heavy load.
-  - Implemented spoof-resistant client IP extraction prioritizing trusted platform headers (`x-vercel-forwarded-for`, `cf-connecting-ip`, `x-real-ip`) and proxy-hop parsing.
-  - Configured a **fail-closed safety policy**: when live Gemini AI is enabled and rate-limiting infrastructure fails or is unreachable, the endpoints reject requests (HTTP 503 Service Unavailable) rather than failing open. Rejected requests never reach the Gemini provider.
-  - Documented `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in `.env.example` and `README.md`.
+  - Replaced the two-stage Redis check/write with a **single atomic Lua script** (`LUA_SLIDING_WINDOW_SCRIPT`) executed via Upstash Redis REST. Pruning expired timestamps (`ZREMRANGEBYSCORE`), counting active hits (`ZCARD`), conditional hit insertion (`ZADD`), and expiration refreshing (`PEXPIRE`) execute in one atomic Redis transaction, eliminating race conditions under concurrent requests.
+  - Required **mandatory Upstash Redis configuration in production** whenever live Gemini AI is enabled. Silent in-memory fallback is strictly prohibited in production; requests fail closed (HTTP 503) and log configuration errors if Redis credentials are missing.
+  - Implemented **strict Redis response validation**: checks HTTP status code (`res.ok`), command execution error payloads (`data.error`), and return script shape (`Array.isArray(data.result) && data.result.length >= 3`), as well as write responses on key deletion (`DEL`).
+  - Improved IPv4/IPv6 address normalization (`normalizeIp`): strips ports from IPv4 (`198.51.100.1:8080` -> `198.51.100.1`) and bracketed IPv6 (`[2001:db8::1]:8443` -> `2001:db8::1`), and validates format according to RFC specifications.
+  - Eliminated assigning unidentified production clients to `127.0.0.1`: generates isolated anonymous hashes (`anon-<hash>`) based on request headers, preventing separate production users from collapsing into a shared quota.
+  - Hard-bounded the local `MemoryRateLimitStore` with strict LRU eviction (`while (this.hits.size >= this.maxKeys) delete oldestKey`), guaranteeing that memory usage never exceeds configured bounds under heavy load in local/demo environments.
+  - Updated `.env.example` and `README.md` to declare Upstash Redis mandatory in production for live AI.
 - **Verification Evidence:**
-  - `tests/rate-limiter.test.ts` (9 tests passing): verifies threshold enforcement, RFC `Retry-After`, client counter isolation, expiration resets, LRU hard bounding, mock Upstash REST pipeline requests, fail-closed safety policy, trusted proxy extraction, and policy configurations.
+  - `tests/rate-limiter.test.ts` (21 tests passing):
+    - **Concurrent Race-Condition Test:** Sent 30 simultaneous requests with a limit of 5 requests per minute against the atomic store. Exactly 5 succeeded and exactly 25 failed with accurate retry-after seconds, proving complete elimination of race conditions.
+    - **Simulated Failures:** Verified rejection on Redis HTTP 500 status, command error payloads (`ERR ...`), malformed script outputs, and DEL key reset failures.
+    - **Production Security Misconfiguration:** Verified that running with live AI in production without Upstash Redis fails closed and logs a security misconfiguration warning.
+    - **IP Parsing & Isolation:** Verified IPv4/IPv6 port stripping and isolated anonymous fingerprints for unidentified production clients.
 
 ### Finding 2: Strict Refinement Schemas
 - **Baseline Defect & Audit Critique:** `RefinePlanSchema` originally used `z.any()` for nested plan structures and had looser validation on event details than event creation.

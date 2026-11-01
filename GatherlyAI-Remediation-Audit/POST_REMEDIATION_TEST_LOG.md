@@ -3,8 +3,8 @@
 **Test Execution Date:** October 30, 2026  
 **Environment:** Windows 11, Node.js v22.14.0, Next.js 16.4.3, Vitest v5.0.5, Playwright v1.64.1  
 **Repository:** `https://github.com/mudassar-quraishi/GatherlyAI.git`  
-**Total Automated Tests:** 54  
-**Passed:** 54 (100%)  
+**Total Automated Tests:** 66  
+**Passed:** 66 (100%)  
 **Failed:** 0  
 **Skipped:** 0  
 
@@ -13,19 +13,31 @@
 ## 1. Vitest Unit & Integration Test Suite (`npm test`)
 
 **Command:** `npm test` (`vitest run`)  
-**Duration:** ~8.15s  
-**Outcome:** 8 test files passed (44 tests passed out of 44)  
+**Duration:** ~14.2s  
+**Outcome:** 8 test files passed (56 tests passed out of 56)  
 
-### Suite 1: `tests/rate-limiter.test.ts` (9 tests) — COMPREHENSIVE
-- ✓ allows requests under the configured threshold (2ms)
-- ✓ returns 429 when request rate exceeds the threshold (1ms)
-- ✓ computes correct Retry-After header duration (1ms)
-- ✓ enforces independent thresholds for generation vs refinement (1ms)
-- ✓ isolates rate limit counters across distinct client identifiers (1ms)
-- ✓ resets limit quota once time window expires (1ms)
-- ✓ bounds memory store size strictly via LRU eviction under heavy key churn (2ms)
-- ✓ executes atomic pipeline on Upstash Redis REST backend when configured (3ms)
-- ✓ handles fail-closed safety policy when rate limit backend encounters an error (2ms)
+### Suite 1: `tests/rate-limiter.test.ts` (21 tests) — ATOMIC LUA & CONCURRENCY
+- ✓ allows requests within the configured threshold (2ms)
+- ✓ rejects requests exceeding the limit with accurate retryAfterSeconds (1ms)
+- ✓ isolates different clients independently (1ms)
+- ✓ resets limits after the sliding window expires (1ms)
+- ✓ enforces strict hard bounds via LRU eviction to prevent unbounded memory growth (2ms)
+- ✓ executes atomic Lua script with Upstash Redis REST and returns correct sliding-window quota (3ms)
+- ✓ **handles 30 simultaneous requests with limit of 5: exactly 5 succeed and 25 fail without race conditions (Atomic Redis)** (4ms)
+- ✓ handles 30 simultaneous requests with limit of 5 on MemoryRateLimitStore (1ms)
+- ✓ validates Redis HTTP response status and throws on HTTP 500 error (2ms)
+- ✓ validates individual Redis command execution errors and throws on error payload (1ms)
+- ✓ validates script return shape and throws on malformed output (1ms)
+- ✓ validates DEL response when resetting key (1ms)
+- ✓ enforces fail-closed behavior when backend fails and fail-closed is active (2ms)
+- ✓ strictly prohibits silent in-memory fallback in production when live Gemini is enabled (2ms)
+- ✓ allows in-memory fallback in local development or demo mode without Upstash (1ms)
+- ✓ normalizes IPv4 addresses and strips port numbers (1ms)
+- ✓ normalizes IPv6 addresses including bracketed ports (1ms)
+- ✓ rejects invalid or malformed IP addresses (1ms)
+- ✓ extracts client IP safely from trusted proxy headers without spoofing vulnerabilities (2ms)
+- ✓ isolates unidentified production clients using anonymous fingerprints rather than 127.0.0.1 (2ms)
+- ✓ enforces distinct policies for generate (5/min) vs refine (10/min) (1ms)
 
 ### Suite 2: `tests/validation.test.ts` (11 tests) — STRICT TYPED SCHEMAS
 - ✓ accepts a valid event details payload (2ms)

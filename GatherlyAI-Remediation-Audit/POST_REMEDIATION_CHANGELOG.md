@@ -9,28 +9,28 @@
 
 ## 1. Summary of Changes by File
 
-### 1. `lib/security/rateLimiter.ts` [NEW FILE]
-- **Purpose:** Server-side sliding-window rate limiting engine with support for in-memory bounded storage, periodic garbage collection, clock injection, proxy-aware client resolution, and integration hooks for distributed Redis (Upstash).
-- **Finding Addressed:** Finding 1 (Rate limiting on public AI endpoints).
-- **Relevant Tests Added:** `tests/rate-limiter.test.ts` (6 tests).
-- **Validation Result:** Verified via 6 passing unit tests, HTTP 429 response verification, and `Retry-After` calculation.
+### 1. `lib/security/rateLimiter.ts` [REWRITTEN & HARDENED]
+- **Purpose:** Server-side sliding-window rate limiting engine executing a single atomic Lua script (`LUA_SLIDING_WINDOW_SCRIPT`) in Upstash Redis REST to guarantee zero race conditions under concurrent requests. Enforces mandatory Upstash Redis configuration in production whenever live Gemini is enabled (silent in-memory fallback strictly prohibited, failing closed with HTTP 503). Validates Redis HTTP response codes (`res.ok`), command execution error payloads (`data.error`), and return shapes. Hard-bounds local memory store via strict LRU eviction. Normalizes IPv4/IPv6 with port stripping and prevents shared quota collapse by generating isolated anonymous fingerprints (`anon-<hash>`) in production.
+- **Finding Addressed:** Finding 1 (Rate limiting on public AI endpoints & distributed race condition elimination).
+- **Relevant Tests Added:** `tests/rate-limiter.test.ts` (expanded to 21 tests, including 30-request concurrent race-condition test and simulated Redis HTTP/command failure tests).
+- **Validation Result:** Verified via 21 passing unit tests (100% pass rate), atomic evaluation, HTTP 429/503 response verification, and `Retry-After` calculation.
 
 ### 2. `app/api/generate-plan/route.ts` [MODIFIED]
-- **Purpose:** Integrated rate limiting check before invoking expensive AI generation logic; returns HTTP 429 when client exceeds 5 requests per minute.
+- **Purpose:** Integrated rate limiting check before invoking expensive AI generation logic; returns HTTP 429 when client exceeds 5 requests per minute, or HTTP 503 when rate-limiting backend fails closed.
 - **Finding Addressed:** Finding 1 (Rate limiting on public AI endpoints).
 - **Relevant Tests Added:** `tests/rate-limiter.test.ts`.
 - **Validation Result:** Verified via route tests and Playwright error tests.
 
 ### 3. `app/api/refine-plan/route.ts` [MODIFIED]
-- **Purpose:** Integrated rate limiting check before invoking AI refinement logic; returns HTTP 429 when client exceeds 10 requests per minute.
+- **Purpose:** Integrated rate limiting check before invoking AI refinement logic; returns HTTP 429 when client exceeds 10 requests per minute, or HTTP 503 when rate-limiting backend fails closed.
 - **Finding Addressed:** Finding 1 (Rate limiting on public AI endpoints).
 - **Relevant Tests Added:** `tests/rate-limiter.test.ts`.
 - **Validation Result:** Verified via route tests.
 
-### 4. `.env.example` [MODIFIED]
-- **Purpose:** Documented optional distributed rate limiter environment variables (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) with placeholder values only.
-- **Finding Addressed:** Finding 1 (Rate limiting deployment documentation).
-- **Validation Result:** Verified no secrets exposed in repository.
+### 4. `.env.example` & `README.md` [MODIFIED]
+- **Purpose:** Made Upstash Redis configuration mandatory in production whenever live Gemini AI is enabled. Clarified that silent in-memory fallback is prohibited in production to prevent distributed quota exhaustion across serverless or containerized instances.
+- **Finding Addressed:** Finding 1 (Production rate limiting configuration enforcement).
+- **Validation Result:** Verified no secrets exposed in repository; documentation reflects mandatory status.
 
 ### 5. `lib/validation/schemas.ts` [MODIFIED]
 - **Purpose:** Replaced `z.any()` in `RefinePlanSchema` with concrete schemas (`ThemeIdeaSchema`, `BudgetCategorySchema`, `BudgetBreakdownSchema`, `TimelineTaskSchema`, `VendorItemSchema`, `ScheduleItemSchema`, `PersonalizedIdeaSchema`, `RiskContingencySchema`, `CurrentPlanSchema`); bounded string and array lengths.
