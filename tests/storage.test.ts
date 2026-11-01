@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { eventStorage } from '@/lib/storage/eventStorage';
-import { EventDetails } from '@/types/event';
+import type { EventDetails } from '@/types/event';
 
 describe('Event Storage Service (localStorage abstraction)', () => {
   beforeEach(() => {
@@ -30,6 +30,25 @@ describe('Event Storage Service (localStorage abstraction)', () => {
     const retrieved = eventStorage.getEventById('test-event-1');
     expect(retrieved).not.toBeNull();
     expect(retrieved?.name).toBe('Rohan Birthday Bash');
+  });
+
+  it('skips malformed saved records and keeps valid event data if a stored plan is damaged', () => {
+    const validEvent = eventStorage.loadDemoEvent();
+    const planlessEvent = { ...validEvent, id: 'event-with-damaged-plan', plan: { unexpected: true } };
+    localStorage.setItem(
+      'gatherly_ai_events_v1',
+      JSON.stringify([{ id: 'invalid-event' }, validEvent, planlessEvent])
+    );
+
+    const loadedEvents = eventStorage.getAllEvents();
+
+    expect(loadedEvents).toHaveLength(2);
+    expect(loadedEvents.find((event) => event.id === validEvent.id)?.plan).toBeDefined();
+    expect(loadedEvents.find((event) => event.id === planlessEvent.id)).toMatchObject({
+      id: 'event-with-damaged-plan',
+      name: validEvent.name,
+    });
+    expect(loadedEvents.find((event) => event.id === planlessEvent.id)?.plan).toBeUndefined();
   });
 
   it('updates an existing event without corrupting other fields', () => {

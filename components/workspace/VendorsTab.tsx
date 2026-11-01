@@ -7,34 +7,42 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { EventDetails, VendorItem, VendorStatus, TaskPriority } from '@/types/event';
+import type { EventDetails, VendorItem, VendorStatus } from '@/types/event';
 import { formatCurrency } from '@/lib/budget/calculator';
+import { isTaskPriority, isVendorStatus, VENDOR_STATUSES } from '@/lib/events/enumValues';
 
 interface VendorsTabProps {
   event: EventDetails;
   onUpdateEvent: (updated: Partial<EventDetails>) => void;
 }
 
-export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
-  const plan = event.plan;
-  const vendors = plan?.vendorChecklist || [];
+type NewVendorForm = Omit<VendorItem, 'id'>;
+type StatusFilter = 'all' | VendorStatus;
 
-  const [statusFilter, setStatusFilter] = useState<'all' | VendorStatus>('all');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editNotes, setEditNotes] = useState('');
-
-  // Add vendor modal
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newVendor, setNewVendor] = useState({
+function createNewVendorForm(): NewVendorForm {
+  return {
     category: 'Catering',
     title: '',
     needDescription: '',
     whyItMatters: '',
     bookingDeadline: '4 weeks before event',
-    priority: 'high' as TaskPriority,
-    status: 'needed' as VendorStatus,
+    priority: 'high',
+    status: 'needed',
     notes: '',
-  });
+  };
+}
+
+export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
+  const plan = event.plan;
+  const vendors = plan?.vendorChecklist || [];
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editNotes, setEditNotes] = useState('');
+
+  // Add vendor modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newVendor, setNewVendor] = useState<NewVendorForm>(createNewVendorForm);
 
   const confirmedCount = vendors.filter((v) => v.status === 'confirmed').length;
   const activeVendors = vendors.filter((v) => v.status !== 'not-required');
@@ -88,7 +96,7 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
       bookingDeadline: newVendor.bookingDeadline.trim(),
       priority: newVendor.priority,
       status: newVendor.status,
-      notes: newVendor.notes.trim(),
+      notes: newVendor.notes?.trim() ?? '',
     };
 
     onUpdateEvent({
@@ -98,16 +106,7 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
       },
     });
 
-    setNewVendor({
-      category: 'Catering',
-      title: '',
-      needDescription: '',
-      whyItMatters: '',
-      bookingDeadline: '4 weeks before event',
-      priority: 'high',
-      status: 'needed',
-      notes: '',
-    });
+    setNewVendor(createNewVendorForm());
     setShowAddModal(false);
   };
 
@@ -177,7 +176,7 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
         <span className="font-bold text-[#1E2922] uppercase tracking-wide text-[11px] mr-1">
           Status:
         </span>
-        {(['all', 'needed', 'contacted', 'confirmed', 'not-required'] as const).map((s) => (
+        {(['all', ...VENDOR_STATUSES] satisfies StatusFilter[]).map((s) => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
@@ -280,7 +279,10 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
                   <select
                     id="new-vendor-priority"
                     value={newVendor.priority}
-                    onChange={(e) => setNewVendor({ ...newVendor, priority: e.target.value as TaskPriority })}
+                    onChange={(event) => {
+                      const priority = event.currentTarget.value;
+                      if (isTaskPriority(priority)) setNewVendor((previous) => ({ ...previous, priority }));
+                    }}
                     className="w-full px-3 py-1.5 rounded-xl border border-[#E5DFD5] text-xs"
                   >
                     <option value="high">High</option>
@@ -332,7 +334,10 @@ export default function VendorsTab({ event, onUpdateEvent }: VendorsTabProps) {
                   <select
                     aria-label={`Status for ${vendor.title}`}
                     value={vendor.status}
-                    onChange={(e) => handleStatusChange(vendor.id, e.target.value as VendorStatus)}
+                    onChange={(event) => {
+                      const status = event.currentTarget.value;
+                      if (isVendorStatus(status)) handleStatusChange(vendor.id, status);
+                    }}
                     className={`text-xs font-semibold px-2.5 py-1 rounded-lg border capitalize focus:ring-2 focus:ring-[#1C3F30] ${getStatusBadge(
                       vendor.status
                     )}`}

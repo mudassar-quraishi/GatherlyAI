@@ -1,8 +1,23 @@
-import { EventDetails } from '@/types/event';
+import type { EventDetails } from '@/types/event';
+import { StoredEventBaseSchema, StoredEventPlanSchema } from '@/lib/validation/storedEvents';
 import { createDefaultDemoEvent } from '@/lib/ai/sampleProvider';
 import { formatCurrency } from '@/lib/budget/calculator';
 
 const STORAGE_KEY = 'gatherly_ai_events_v1';
+
+function parseStoredEvent(candidate: unknown): EventDetails | null {
+  const eventResult = StoredEventBaseSchema.safeParse(candidate);
+  if (!eventResult.success) return null;
+
+  if (typeof candidate !== 'object' || candidate === null || !('plan' in candidate)) {
+    return eventResult.data;
+  }
+
+  const planResult = StoredEventPlanSchema.safeParse(candidate.plan);
+  return planResult.success
+    ? { ...eventResult.data, plan: planResult.data }
+    : eventResult.data;
+}
 
 /**
  * Safe local storage service handling JSON parsing, versioning,
@@ -17,10 +32,14 @@ export const eventStorage = {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return [];
-      const parsed = JSON.parse(raw);
+      const parsed: unknown = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed.sort(
-          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        const events = parsed.flatMap((candidate) => {
+          const event = parseStoredEvent(candidate);
+          return event ? [event] : [];
+        });
+        return events.sort((left, right) =>
+          new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
         );
       }
       return [];

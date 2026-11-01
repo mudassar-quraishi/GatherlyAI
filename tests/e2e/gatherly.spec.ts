@@ -283,7 +283,7 @@ test.describe('Gatherly AI End-to-End Regression Suite', () => {
     await page.fill('#name', 'A'); // Invalid length (< 2)
     await page.click('button:has-text("Continue")');
 
-    await expect(page.locator('text=Please provide an event name (at least 2 characters)').first()).toBeVisible();
+    await expect(page.locator('text=Please provide an event name (2 to 100 characters)').first()).toBeVisible();
 
     // Ensure no raw secrets or stack traces leaked
     const bodyText = await page.textContent('body');

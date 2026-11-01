@@ -9,13 +9,13 @@ import {
   ArrowRight,
   TrendingUp,
 } from 'lucide-react';
-import { EventDetails } from '@/types/event';
+import type { EventDetails } from '@/types/event';
 import { formatCurrency, calculateBudgetHealth } from '@/lib/budget/calculator';
 import { calculateReadinessScore } from '@/lib/readiness/calculator';
 
 interface OverviewTabProps {
   event: EventDetails;
-  onNavigateTab: (tabId: string) => void;
+  onNavigateTab: (tabId: 'budget' | 'ideas' | 'timeline') => void;
 }
 
 export default function OverviewTab({ event, onNavigateTab }: OverviewTabProps) {

@@ -9,7 +9,7 @@ import TimelineTab from '@/components/workspace/TimelineTab';
 import VendorsTab from '@/components/workspace/VendorsTab';
 import ScheduleTab from '@/components/workspace/ScheduleTab';
 import IdeasTab from '@/components/workspace/IdeasTab';
-import { EventDetails } from '@/types/event';
+import type { EventDetails } from '@/types/event';
 import { eventStorage } from '@/lib/storage/eventStorage';
 import { generateSamplePlan } from '@/lib/ai/sampleProvider';
 import { calculateReadinessScore } from '@/lib/readiness/calculator';
@@ -24,6 +24,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 
 interface WorkspacePageProps {
@@ -31,6 +32,11 @@ interface WorkspacePageProps {
 }
 
 type TabType = 'overview' | 'budget' | 'timeline' | 'vendors' | 'schedule' | 'ideas';
+interface WorkspaceTab {
+  id: TabType;
+  label: string;
+  icon: LucideIcon;
+}
 
 function WorkspaceContent({ params }: WorkspacePageProps) {
   const resolvedParams = use(params);
@@ -155,7 +161,7 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
     );
   }
 
-  const tabs = [
+  const tabs: WorkspaceTab[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'budget', label: 'Budget Planner', icon: DollarSign },
     { id: 'timeline', label: 'Timeline & Tasks', icon: Calendar },
@@ -179,7 +185,7 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
     if (targetIndex !== -1) {
       e.preventDefault();
       const nextTab = tabs[targetIndex];
-      setActiveTab(nextTab.id as TabType);
+      setActiveTab(nextTab.id);
       tabRefs.current[targetIndex]?.focus();
     }
   };
@@ -227,7 +233,7 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
                   ref={(el) => {
                     tabRefs.current[idx] = el;
                   }}
-                  onClick={() => setActiveTab(tab.id as TabType)}
+                  onClick={() => setActiveTab(tab.id)}
                   onKeyDown={(e) => handleTabKeyDown(e, idx)}
                   className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap focus:outline-hidden focus:ring-2 focus:ring-[#1C3F30] focus:ring-offset-2 ${
                     isActive
@@ -266,7 +272,7 @@ function WorkspaceContent({ params }: WorkspacePageProps) {
           hidden={activeTab !== 'overview'}
           className="no-print focus:outline-hidden"
         >
-          <OverviewTab event={event} onNavigateTab={(t) => setActiveTab(t as TabType)} />
+          <OverviewTab event={event} onNavigateTab={setActiveTab} />
         </div>
 
         <div

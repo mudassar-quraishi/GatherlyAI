@@ -8,13 +8,13 @@ This file records local checks run in the current checkout. It is not an indepen
 
 ## PromptWars portal baseline
 
-The user-provided portal screenshot for the previously submitted version shows **94.35/100**: Code Quality 88, Security 99, Efficiency 100, Testing 98, Accessibility 98, and Problem Statement Alignment 93. These are the prior submission's actual scores. The code changes recorded below have not been submitted to PromptWars, so a new portal score is not yet known. The user reported two submission attempts remained; this work did not consume one.
+The latest user-provided PromptWars screenshot shows **96.72/100**: Code Quality 88, Security 99, Efficiency 100, Testing 99, Accessibility 99, and Problem Statement Alignment 100. The earlier submitted version scored **94.35/100** (Code Quality 88, Security 99, Efficiency 100, Testing 98, Accessibility 98, Alignment 93). The code changes recorded below have not been submitted, so they have no portal score yet. The user reported two submission attempts remained; this work did not consume one.
 
 ## Automated checks
 
 | Command | Result |
 |---|---|
-| `npm run test` | 73 tests passed across 9 files |
+| `npm run test` | 78 tests passed across 10 files |
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed; no warnings reported |
 | `npm run build` | Passed |

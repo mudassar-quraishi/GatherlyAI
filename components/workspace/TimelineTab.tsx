@@ -10,20 +10,44 @@ import {
   Check,
   User,
 } from 'lucide-react';
-import { EventDetails, TimelineTask, TaskStatus, TaskPriority, TaskStage } from '@/types/event';
+import type { EventDetails, TimelineTask, TaskStatus, TaskPriority } from '@/types/event';
 import { getStageLabel } from '@/lib/timeline/calculator';
+import {
+  isTaskPriority,
+  isTaskStage,
+  isTaskStatus,
+  TASK_PRIORITIES,
+  TASK_STAGES,
+  TASK_STATUSES,
+} from '@/lib/events/enumValues';
 
 interface TimelineTabProps {
   event: EventDetails;
   onUpdateEvent: (updated: Partial<EventDetails>) => void;
 }
 
+type NewTaskForm = Omit<TimelineTask, 'id'>;
+type StatusFilter = 'all' | TaskStatus;
+type PriorityFilter = 'all' | TaskPriority;
+
+function createNewTaskForm(eventDate: string): NewTaskForm {
+  return {
+    title: '',
+    description: '',
+    stage: 'early-preparations',
+    dueDate: eventDate,
+    priority: 'medium',
+    status: 'todo',
+    owner: '',
+  };
+}
+
 export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) {
   const plan = event.plan;
   const tasks = plan?.timelineTasks || [];
 
-  const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
-  const [priorityFilter, setPriorityFilter] = useState<'all' | TaskPriority>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
   // Edit task state
@@ -34,15 +58,7 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
 
   // Add task state
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    stage: 'early-preparations' as TaskStage,
-    dueDate: event.date,
-    priority: 'medium' as TaskPriority,
-    status: 'todo' as TaskStatus,
-    owner: '',
-  });
+  const [newTask, setNewTask] = useState<NewTaskForm>(() => createNewTaskForm(event.date));
 
   const completedCount = tasks.filter((t) => t.status === 'done').length;
   const progressPercent = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
@@ -127,7 +143,7 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
       dueDate: newTask.dueDate || event.date,
       priority: newTask.priority,
       status: newTask.status,
-      owner: newTask.owner.trim(),
+      owner: newTask.owner?.trim() ?? '',
     };
 
     onUpdateEvent({
@@ -137,15 +153,7 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
       },
     });
 
-    setNewTask({
-      title: '',
-      description: '',
-      stage: 'early-preparations',
-      dueDate: event.date,
-      priority: 'medium',
-      status: 'todo',
-      owner: '',
-    });
+    setNewTask(createNewTaskForm(event.date));
     setShowAddModal(false);
   };
 
@@ -157,15 +165,7 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
   });
 
   // Group by stage
-  const stagesOrder: TaskStage[] = [
-    'initial-planning',
-    'early-preparations',
-    'month-before',
-    'final-week',
-    'day-before',
-    'event-day',
-    'post-event',
-  ];
+  const stagesOrder = TASK_STAGES;
 
   if (!plan) {
     return (
@@ -216,7 +216,7 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
           <span className="font-bold text-[#1E2922] uppercase tracking-wide text-[11px] mr-1">
             Status:
           </span>
-          {(['all', 'todo', 'in-progress', 'done'] as const).map((s) => (
+          {(['all', ...TASK_STATUSES] satisfies StatusFilter[]).map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
@@ -235,7 +235,7 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
           <span className="font-bold text-[#1E2922] uppercase tracking-wide text-[11px]">
             Priority:
           </span>
-          {(['all', 'high', 'medium', 'low'] as const).map((p) => (
+          {(['all', ...TASK_PRIORITIES] satisfies PriorityFilter[]).map((p) => (
             <button
               key={p}
               onClick={() => setPriorityFilter(p)}
@@ -307,7 +307,10 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
                   <select
                     id="new-task-stage"
                     value={newTask.stage}
-                    onChange={(e) => setNewTask({ ...newTask, stage: e.target.value as TaskStage })}
+                    onChange={(event) => {
+                      const stage = event.currentTarget.value;
+                      if (isTaskStage(stage)) setNewTask((previous) => ({ ...previous, stage }));
+                    }}
                     className="w-full px-3 py-1.5 rounded-xl border border-[#E5DFD5] text-xs"
                   >
                     {stagesOrder.map((st) => (
@@ -327,7 +330,10 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
                   <select
                     id="new-task-priority"
                     value={newTask.priority}
-                    onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as TaskPriority })}
+                    onChange={(event) => {
+                      const priority = event.currentTarget.value;
+                      if (isTaskPriority(priority)) setNewTask((previous) => ({ ...previous, priority }));
+                    }}
                     className="w-full px-3 py-1.5 rounded-xl border border-[#E5DFD5] text-xs"
                   >
                     <option value="high">High Priority</option>
@@ -436,7 +442,10 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
                                 <select
                                   aria-label={`Priority for ${task.title}`}
                                   value={editPriority}
-                                  onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
+                                  onChange={(event) => {
+                                    const priority = event.currentTarget.value;
+                                    if (isTaskPriority(priority)) setEditPriority(priority);
+                                  }}
                                   className="px-2 py-1 rounded border border-[#E5DFD5] text-xs"
                                 >
                                   <option value="high">High</option>
@@ -484,7 +493,10 @@ export default function TimelineTab({ event, onUpdateEvent }: TimelineTabProps) 
 
                                 <select
                                   value={task.status}
-                                  onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
+                                  onChange={(event) => {
+                                    const status = event.currentTarget.value;
+                                    if (isTaskStatus(status)) handleStatusChange(task.id, status);
+                                  }}
                                   className="text-[11px] font-medium bg-[#F4EFEB] text-[#1E2922] border-0 rounded px-1.5 py-0.5 focus:ring-1 focus:ring-[#1C3F30]"
                                 >
                                   <option value="todo">To Do</option>

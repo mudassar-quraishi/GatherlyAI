@@ -147,6 +147,14 @@ flowchart TD
     RefineAPI --> Gemini
 ```
 
+### Project Structure
+
+- `app/` contains the Next.js routes, page composition, and server API handlers.
+- `components/` contains the dashboard, event workspace, and focused event-creation steps.
+- `lib/` contains domain rules, shared validation, persistence, AI providers, and budget/timeline calculations.
+- `tests/` contains unit and integration coverage; `tests/e2e/` contains browser-level regression scenarios.
+- `docs/` contains the demo script, deployment notes, and the latest local verification record.
+
 ---
 
 ## 6. Quick Start & Local Installation
@@ -238,7 +246,7 @@ See the [current verification record](docs/VERIFICATION.md) for the latest run a
 ```bash
 npm run test
 ```
-Executes **73 unit and integration tests across 9 suites** in Vitest:
+Executes **78 unit and integration tests across 10 suites** in Vitest:
 - Budget integer math & contingency calculations (`tests/budget.test.ts`)
 - Calendar timezone-safe timeline anchoring & acceleration (`tests/timeline.test.ts`)
 - Strict Zod schemas for generation & refinement (`tests/validation.test.ts`)
@@ -248,6 +256,7 @@ Executes **73 unit and integration tests across 9 suites** in Vitest:
 - Atomic Lua Redis rate limiting, 30-request concurrency race tests & fail-closed safety (`tests/rate-limiter.test.ts`)
 - WAI-ARIA runtime tab & screen-reader live announcements (`tests/accessibility.test.ts`)
 - API route behavior, malformed JSON handling, and deterministic responses (`tests/api-routes.test.ts`)
+- Event wizard rules, field bounds, real calendar dates, and priority selection limits (`tests/event-wizard.test.ts`)
 
 ### End-to-End Browser Regression Tests (Playwright)
 ```bash
@@ -345,5 +354,5 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 - [x] **Walkthrough Demo Video Script:** Complete 3:40 script in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
 - [x] **No Login Required:** Accessible to evaluators immediately with 1-click demo preloading.
 - [x] **Genuine Functionality:** Editable budgets, task toggles, vendor statuses, schedule editor, AI plan generation & refinement.
-- [x] **Code Quality & Testing:** Latest `npm run verify` passed: 73 Vitest tests across 9 suites, 10 Playwright scenarios, typecheck, lint, and production build.
+- [x] **Code Quality & Testing:** Latest `npm run verify` passed: 78 Vitest tests across 10 suites, 10 Playwright scenarios, typecheck, lint, and production build.
 - [x] **Problem Statement Alignment:** Weddings, birthdays, and community events with budgets, timelines, vendors, and ideas.

@@ -1,12 +1,5 @@
 import { z } from 'zod';
-
-function isValidDateOnly(value: string): boolean {
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(0);
-  date.setUTCHours(0, 0, 0, 0);
-  date.setUTCFullYear(year, month - 1, day);
-  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day;
-}
+import { isValidDateOnly } from '@/lib/dates/dateOnly';
 
 export const EventInputSchema = z.object({
   name: z.string().min(2, 'Event name must be at least 2 characters').max(100, 'Event name must not exceed 100 characters'),
