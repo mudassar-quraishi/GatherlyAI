@@ -23,6 +23,13 @@ The user-provided portal screenshot for the previously submitted version shows *
 
 The latest `npm run verify` passed. Browser scenarios cover dashboard loading, event creation, budget and task persistence, vendor notes, accessible workspace tabs, JSON export, event isolation, validation feedback, and mobile layout. Vitest is capped at two workers to avoid worker-start timeouts in this Windows environment.
 
+## Repository submission checks
+
+- GitHub repository: [public](https://github.com/mudassar-quraishi/GatherlyAI).
+- Remote branches: one branch, `main` (`git ls-remote --heads origin`).
+- Git object database after commit `1980acd`: 576.45 KiB, below the 10 MB limit.
+- Local checkout is clean and tracks `origin/main`.
+
 ## Not verified in this environment
 
 - Live Gemini API behavior: no API key is configured.
