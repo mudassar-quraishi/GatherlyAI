@@ -350,7 +350,7 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 
 - [x] **Functional Web Application:** Fully runnable locally and Vercel-ready.
 - [x] **Public Repository & Branch Rule:** [GitHub repository](https://github.com/mudassar-quraishi/GatherlyAI) is public and has one remote branch, `main`.
-- [x] **Repository Size:** Git object database was 576.45 KiB after the verified code push, under the 10 MB limit; recheck after any further commits.
+- [x] **Repository Size:** Local Git metadata is under 1 MiB, well below the 10 MB limit.
 - [x] **Walkthrough Demo Video Script:** Complete 3:40 script in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
 - [x] **No Login Required:** Accessible to evaluators immediately with 1-click demo preloading.
 - [x] **Genuine Functionality:** Editable budgets, task toggles, vendor statuses, schedule editor, AI plan generation & refinement.

@@ -26,8 +26,8 @@ The latest `npm run verify` passed. Browser scenarios cover dashboard loading, e
 ## Repository submission checks
 
 - GitHub repository: [public](https://github.com/mudassar-quraishi/GatherlyAI).
-- Remote branches: one branch, `main` (`git ls-remote --heads origin`).
-- Git object database after commit `1980acd`: 576.45 KiB, below the 10 MB limit.
+- Remote branch check: exactly one branch, `main` (`git ls-remote --heads origin`).
+- Local `.git` directory measured under 1 MiB, below the 10 MB limit.
 - Local checkout is clean and tracks `origin/main`.
 
 ## Not verified in this environment
