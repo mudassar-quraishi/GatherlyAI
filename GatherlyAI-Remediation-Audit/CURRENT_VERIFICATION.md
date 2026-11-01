@@ -24,7 +24,7 @@ The browser scenarios cover dashboard loading, event creation, budget and task p
 - Live Gemini API behavior: no API key is configured.
 - Production Upstash Redis behavior: no production credentials are configured.
 - Dependency vulnerability status: `npm audit --omit=dev` could not reach the npm registry, so no audit result is claimed.
-- The GitHub Actions workflow is configured but its first hosted run awaits publishing these local changes.
+- The GitHub Actions workflow is committed to `main`; its first hosted run has not yet been verified.
 - The existing GitHub repository is public; recheck the one-branch rule and repository size after publishing the final changes.
 
 See `POST_REMEDIATION_SCORECARD.md` for an indicative self-assessment against the challenge's evaluation areas. The challenge criteria do not specify numeric weights, so that estimate is not an official score.
