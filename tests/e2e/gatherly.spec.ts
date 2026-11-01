@@ -202,7 +202,7 @@ test.describe('Gatherly AI End-to-End Regression Suite', () => {
     await page.goto('/events/demo-event-wedding-2026');
 
     await page.click('#tab-ideas');
-    await expect(page.getByText(/event context, your current plan summary, budget categories, and refinement request are sent to Google/i)).toBeVisible();
+    await expect(page.getByText(/With live Gemini enabled, Gatherly sends event details/i)).toBeVisible();
     await expect(page.getByLabel('Custom Refinement Instruction')).toHaveAttribute('maxlength', '600');
 
     // Trigger copy summary

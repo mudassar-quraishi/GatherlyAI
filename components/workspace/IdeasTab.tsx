@@ -93,6 +93,10 @@ export default function IdeasTab({ event, onUpdateEvent }: IdeasTabProps) {
             venueType: event.venueType,
             atmosphere: event.atmosphere,
             priorities: event.priorities,
+            dietaryRequirements: event.dietaryRequirements,
+            accessibilityRequirements: event.accessibilityRequirements,
+            specialActivities: event.specialActivities,
+            additionalNotes: event.additionalNotes,
           },
           currentPlan: plan,
         }),
@@ -144,7 +148,7 @@ export default function IdeasTab({ event, onUpdateEvent }: IdeasTabProps) {
           Request real-time plan modifications. The AI engine recalculates allocations, vendor recommendations, and activities while preserving your existing budget ceiling.
         </p>
         <p className="text-xs text-[#64746D] mb-6">
-          With live Gemini enabled, event context, your current plan summary, budget categories, and refinement request are sent to Google. Avoid including sensitive personal details.
+          With live Gemini enabled, Gatherly sends event details (including style, priorities, food and accessibility needs, activities, and host notes), the plan summary, budget categories, task and vendor progress, run sheet, and your refinement request to Google. Avoid including sensitive personal details.
         </p>
 
         {refinementSuccessNotice && (

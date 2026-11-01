@@ -6,18 +6,22 @@
 
 This file records local checks run in the current checkout. It is not an independent audit, a security certification, or an official contest result.
 
+## PromptWars portal baseline
+
+The user-provided portal screenshot for the previously submitted version shows **94.35/100**: Code Quality 88, Security 99, Efficiency 100, Testing 98, Accessibility 98, and Problem Statement Alignment 93. These are the prior submission's actual scores. The code changes recorded below have not been submitted to PromptWars, so a new portal score is not yet known. The user reported two submission attempts remained; this work did not consume one.
+
 ## Automated checks
 
 | Command | Result |
 |---|---|
-| `npm run test` | 66 tests passed across 9 files |
+| `npm run test` | 73 tests passed across 9 files |
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed; no warnings reported |
 | `npm run build` | Passed |
 | `npm run test:e2e` | 10 browser scenarios passed against the production build; command exited 0 |
 | `npm run verify` | Passed the combined type, lint, unit, build, and browser sequence |
 
-The browser scenarios cover dashboard loading, event creation, budget and task persistence, vendor notes, accessible workspace tabs, JSON export, event isolation, validation feedback, and mobile layout.
+The latest `npm run verify` passed. Browser scenarios cover dashboard loading, event creation, budget and task persistence, vendor notes, accessible workspace tabs, JSON export, event isolation, validation feedback, and mobile layout. Vitest is capped at two workers to avoid worker-start timeouts in this Windows environment.
 
 ## Not verified in this environment
 
@@ -25,6 +29,5 @@ The browser scenarios cover dashboard loading, event creation, budget and task p
 - Production Upstash Redis behavior: no production credentials are configured.
 - Dependency vulnerability status: `npm audit --omit=dev` could not reach the npm registry, so no audit result is claimed.
 - The GitHub Actions workflow is committed to `main`; its first hosted run has not yet been verified.
-- The existing GitHub repository is public; recheck the one-branch rule and repository size after publishing the final changes.
 
 See `POST_REMEDIATION_SCORECARD.md` for an indicative self-assessment against the challenge's evaluation areas. The challenge criteria do not specify numeric weights, so that estimate is not an official score.

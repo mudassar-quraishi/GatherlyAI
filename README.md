@@ -87,7 +87,8 @@ Gatherly AI pairs **Google Gemini GenAI** with **deterministic application logic
 ### G. AI Refinement Studio
 - Real-time plan modifications dispatching structured prompts to the AI backend.
 - Presets: *More Budget-Friendly*, *Elevate Elegance*, *Eco-Friendly & Zero-Waste*, *Strengthen Rain Contingency*, *Child-Friendly*, and *Custom Prompts*.
-- Updates the relevant plan section without wiping out user changes.
+- Carries matching task completion, vendor status and notes, recorded spending, and run-sheet notes across live refinements.
+- Deterministic demo refinements apply explicit preset rules to the current plan and retain user progress; unsupported free-form requests are recorded as a review task instead of being described as understood.
 
 ### H. Data-Driven Preparation Readiness Score
 - Transparent 0–100% calculation based on:
@@ -217,7 +218,9 @@ Gatherly AI uses the official Google GenAI SDK (`@google/genai`).
 
 Gatherly AI provides a first-class **Deterministic Demo Mode**:
 - **Zero Configuration Required:** If no `GEMINI_API_KEY` is configured, the application functions seamlessly without error dialogs or dead buttons.
-- **1-Click Preloaded Demo Event:** On the dashboard, clicking **"Explore Sample Event (1-Click Demo)"** or **"Load Demo Event"** instantly loads *"Aarav & Meera's Lakeside Wedding"*, complete with an 8-category reconciled budget, 10-step date-anchored timeline, 5 essential suppliers, an 8-stage run sheet, and personalized ideas.
+- **Vertical-Specific Profiles:** Wedding, birthday, anniversary, community, fundraiser, and other event plans have different budgets, tasks, supplier needs, schedules, ideas, and risks. Selected priorities and stated food, access, activity, and host requirements are carried into the starter plan.
+- **1-Click Preloaded Demo Event:** On the dashboard, clicking **"Explore Sample Event (1-Click Demo)"** or **"Load Demo Event"** loads *"Aarav & Meera's Lakeside Wedding"* as an editable example.
+- **Honest Progress State:** Demo plans start with tasks marked *To do* and vendors marked *Needed*. They do not imply that a booking, quote, deposit, or task completion has happened.
 - **Clear Labeling:** Plans generated or refined in demo mode are visibly badged as `Demo Mode (Deterministic)` or `Curated Sample Plan` so evaluators are never misled.
 
 ---
@@ -235,7 +238,7 @@ See the [current verification record](GatherlyAI-Remediation-Audit/CURRENT_VERIF
 ```bash
 npm run test
 ```
-Executes **66 unit and integration tests across 9 suites** in Vitest:
+Executes **73 unit and integration tests across 9 suites** in Vitest:
 - Budget integer math & contingency calculations (`tests/budget.test.ts`)
 - Calendar timezone-safe timeline anchoring & acceleration (`tests/timeline.test.ts`)
 - Strict Zod schemas for generation & refinement (`tests/validation.test.ts`)
@@ -310,7 +313,7 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 - **Pseudonymous Rate-Limit Keys:** Client identifiers are normalized and hashed before being passed to the rate-limit store. Configure the trusted proxy hop count for your hosting platform; forwarded IP headers are meaningful only when set by a trusted proxy.
 - **No Public API Key Exposure:** The Gemini API key is read solely server-side via `process.env.GEMINI_API_KEY`. It is never exposed in client bundles or network responses.
 - **Server-Side Input Validation:** API requests use Zod schemas with bounded numerical limits, guest-count checks (1–50,000), real calendar-date validation, and string length caps. Malformed JSON receives a 400 response.
-- **Data Handling:** Plans are stored in browser `localStorage`; the app does not persist event records in its own database. Requests go to the hosted app API when users generate or refine a plan. With live Gemini enabled, generation sends event details to Google; refinement sends event context, budget category names, the plan summary, and the user's refinement request. Provider errors are not returned verbatim. Do not enter sensitive personal details into AI prompts.
+- **Data Handling:** Plans are stored in browser `localStorage`; the app does not persist event records in its own database. Requests go to the hosted app API when users generate or refine a plan. With live Gemini enabled, refinement sends event details and stated needs, the plan summary, budget category names and allocations, task/vendor progress, run-sheet activities and times, and the user's refinement request to Google. Provider errors are not returned verbatim. Do not enter sensitive personal details into AI prompts.
 - **Rate-Limit Store:** Production live-AI deployments use Upstash Redis to store hashed client keys and request timestamps. This is operational metadata, not event-plan storage.
 
 ---
@@ -319,6 +322,7 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 
 - **Browser-Local Scope:** Because data is persisted in browser `localStorage`, event plans are isolated to the specific browser and device. Cross-device cloud sync is intentionally omitted in this hackathon MVP.
 - **Planning Guidance vs. Live Marketplace:** Gatherly AI generates strategic vendor criteria and requirements; it does not book live vendors, process credit card payments, or scrape live supplier inventories.
+- **Deterministic Custom Refinements:** Without a Gemini key, preset refinements use explicit local rules; a custom request is only matched to a small set of supported keywords. Other requests are saved for organizer review instead of being semantically interpreted.
 
 ---
 
@@ -340,5 +344,5 @@ Gatherly AI is optimized for 1-click deployment on [Vercel](https://vercel.com):
 - [x] **Walkthrough Demo Video Script:** Complete 3:40 script in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
 - [x] **No Login Required:** Accessible to evaluators immediately with 1-click demo preloading.
 - [x] **Genuine Functionality:** Editable budgets, task toggles, vendor statuses, schedule editor, AI plan generation & refinement.
-- [x] **Code Quality & Testing:** 66/66 Vitest tests pass across 9 suites; 10/10 Playwright scenarios pass when run through `npm run test:e2e`; typecheck and lint pass.
+- [x] **Code Quality & Testing:** Latest `npm run verify` passed: 73 Vitest tests across 9 suites, 10 Playwright scenarios, typecheck, lint, and production build.
 - [x] **Problem Statement Alignment:** Weddings, birthdays, and community events with budgets, timelines, vendors, and ideas.

@@ -1,8 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RefinePlanSchema } from '@/lib/validation/schemas';
+import { CurrentPlanSchema, RefinePlanSchema } from '@/lib/validation/schemas';
 import { refineEventPlanWithAI } from '@/lib/ai/geminiService';
-import { EventDetails, EventPlan, EventType, VenueType } from '@/types/event';
+import type { EventDetails, EventPlan } from '@/types/event';
 import { checkRateLimit, RATE_LIMIT_POLICIES, getClientIdentifier } from '@/lib/security/rateLimiter';
+import { normalizeBudgetBreakdown } from '@/lib/budget/calculator';
+import { z } from 'zod';
+
+function toEventPlan(data: z.infer<typeof CurrentPlanSchema>, totalBudget: number): EventPlan {
+  const budgetBreakdown = normalizeBudgetBreakdown(
+    totalBudget,
+    data.budgetBreakdown.categories.map((category, index) => ({
+      id: category.id ?? `refine-input-budget-${index + 1}`,
+      name: category.name,
+      allocatedAmount: category.allocatedAmount,
+      actualSpent: category.actualSpent,
+      isEssential: category.isEssential,
+      notes: category.notes,
+    }))
+  );
+
+  return {
+    eventSummary: data.eventSummary,
+    themeIdeas: data.themeIdeas,
+    budgetBreakdown,
+    timelineTasks: data.timelineTasks.map((task, index) => ({
+      ...task,
+      id: task.id ?? `refine-input-task-${index + 1}`,
+    })),
+    vendorChecklist: data.vendorChecklist.map((vendor, index) => ({
+      ...vendor,
+      id: vendor.id ?? `refine-input-vendor-${index + 1}`,
+    })),
+    eventDaySchedule: data.eventDaySchedule.map((item, index) => ({
+      ...item,
+      id: item.id ?? `refine-input-schedule-${index + 1}`,
+    })),
+    personalizedIdeas: data.personalizedIdeas.map((idea, index) => ({
+      ...idea,
+      id: idea.id ?? `refine-input-idea-${index + 1}`,
+    })),
+    risksAndContingencies: data.risksAndContingencies,
+    generatedAt: data.generatedAt ?? new Date().toISOString(),
+    generationSource: data.generationSource ?? 'demo',
+    modelUsed: data.modelUsed,
+    lastRefinedAt: data.lastRefinedAt,
+  };
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,25 +97,29 @@ export async function POST(req: NextRequest) {
 
     const fullEvent: EventDetails = {
       name: eventDetails.name,
-      eventType: (eventDetails.eventType || 'other') as EventType,
+      eventType: eventDetails.eventType,
       date: eventDetails.date,
+      duration: eventDetails.duration,
       location: eventDetails.location,
       guestCount: eventDetails.guestCount,
       totalBudget: eventDetails.totalBudget,
       currency: eventDetails.currency,
       styleTheme: eventDetails.styleTheme,
-      venueType: (eventDetails.venueType || 'mixed') as VenueType,
+      venueType: eventDetails.venueType,
       atmosphere: eventDetails.atmosphere,
-      priorities: eventDetails.priorities || ['Quality Food'],
+      priorities: eventDetails.priorities,
+      dietaryRequirements: eventDetails.dietaryRequirements,
+      accessibilityRequirements: eventDetails.accessibilityRequirements,
+      specialActivities: eventDetails.specialActivities,
+      additionalNotes: eventDetails.additionalNotes,
       id: 'event-current',
-      duration: 'Full Day',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     const result = await refineEventPlanWithAI(
       fullEvent,
-      currentPlan as EventPlan,
+      toEventPlan(currentPlan, eventDetails.totalBudget),
       modificationType,
       customPrompt
     );

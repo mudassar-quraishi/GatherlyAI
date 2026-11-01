@@ -7,6 +7,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.ts'],
+    maxWorkers: 2,
   },
   resolve: {
     alias: {
