@@ -232,7 +232,7 @@ Gatherly AI provides a first-class **Deterministic Demo Mode**:
 npm run verify
 ```
 Runs type checking, lint, unit/integration tests, a production build, and the Playwright browser suite. The GitHub Actions workflow runs this same command on pushes and pull requests to `main`.
-See the [current verification record](GatherlyAI-Remediation-Audit/CURRENT_VERIFICATION.md) for the latest run and checks that still require deployment credentials or network access.
+See the [current verification record](docs/VERIFICATION.md) for the latest run and checks that still require deployment credentials or network access.
 
 ### Unit & Integration Tests (Vitest)
 ```bash

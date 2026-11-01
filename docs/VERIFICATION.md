@@ -37,4 +37,4 @@ The latest `npm run verify` passed. Browser scenarios cover dashboard loading, e
 - Dependency vulnerability status: `npm audit --omit=dev` could not reach the npm registry, so no audit result is claimed.
 - The GitHub Actions workflow is committed to `main`; its first hosted run has not yet been verified.
 
-See `POST_REMEDIATION_SCORECARD.md` for an indicative self-assessment against the challenge's evaluation areas. The challenge criteria do not specify numeric weights, so that estimate is not an official score.
+These automated checks do not predict a PromptWars score; only the portal can provide a new score after a submission.
